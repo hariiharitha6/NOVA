@@ -1,0 +1,36 @@
+appId: com.nova.desktop
+productName: NOVA
+copyright: Copyright © 2026 NOVA
+
+directories:
+  output: dist
+  buildResources: resources
+
+files:
+  - out/**/*
+  - resources/**/*
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/tray.png
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  shortcutName: NOVA
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: public.app-category.utilities
+
+linux:
+  target: AppImage
+  category: Utility

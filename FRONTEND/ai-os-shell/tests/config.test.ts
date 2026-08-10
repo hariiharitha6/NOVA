@@ -1,0 +1,154 @@
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { createConfigStore, sanitizeConfigPatch } from '../electron/core/config'
+import { defaultConfig } from '../electron/core/types'
+
+function makeStore() {
+  const dir = mkdtempSync(join(tmpdir(), 'nova-config-'))
+  const file = join(dir, 'config.json')
+  const store = createConfigStore(file)
+  return { store, file, dir }
+}
+
+describe('createConfigStore', () => {
+  it('returns defaults when no file exists', () => {
+    const { store } = makeStore()
+    expect(store.get()).toEqual(defaultConfig())
+  })
+
+  it('defaults hotkey to Control+Space', () => {
+    const { store } = makeStore()
+    expect(store.get().hotkey).toBe('Control+Space')
+  })
+
+  it('persists updates and reloads them from disk', () => {
+    const { store, file, dir } = makeStore()
+    store.update({ alwaysOnTop: false })
+    const fromDisk = JSON.parse(readFileSync(file, 'utf-8'))
+    expect(fromDisk.alwaysOnTop).toBe(false)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('merges partial updates without losing other keys', () => {
+    const { store } = makeStore()
+    const next = store.update({ startup: true })
+    expect(next.startup).toBe(true)
+    expect(next.hotkey).toBe('Control+Space')
+  })
+
+  it('records recents, dedupes, and caps at 10', () => {
+    const { store } = makeStore()
+    for (let i = 0; i < 12; i++) {
+      store.recordRecent({ id: `app-${i}`, label: `App ${i}` })
+    }
+    store.recordRecent({ id: 'app-5', label: 'App 5' })
+    const recents = store.get().recents
+    expect(recents).toHaveLength(10)
+    expect(recents[0].id).toBe('app-5')
+    expect(new Set(recents.map((r) => r.id)).size).toBe(10)
+  })
+
+  it('recovers when the config file is corrupt', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nova-config-'))
+    const file = join(dir, 'config.json')
+    const { writeFileSync } = require('node:fs') as typeof import('node:fs')
+    writeFileSync(file, '{not valid json', 'utf-8')
+    const store = createConfigStore(file)
+    expect(store.get()).toEqual(defaultConfig())
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('persists favorites and reloads them from disk', () => {
+    const { store, file, dir } = makeStore()
+    store.update({ favorites: ['app-chrome', 'app-vscode'] })
+    const again = createConfigStore(file)
+    expect(again.get().favorites).toEqual(['app-chrome', 'app-vscode'])
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('persists custom apps, websites and file/folder shortcuts', () => {
+    const { store, dir } = makeStore()
+    store.update({
+      customApps: [
+        { id: 'app-hello', name: 'Hello App', aliases: ['hello'], path: 'C:\\hello.exe' },
+      ],
+      websites: [
+        { id: 'web-example', name: 'Example', aliases: ['example'], url: 'https://example.com' },
+      ],
+      fileFolders: [
+        { id: 'folder-tmp', name: 'Temp', path: 'C:\\Temp', kind: 'folder' },
+        { id: 'file-note', name: 'Notes', path: 'C:\\notes.txt', kind: 'file' },
+      ],
+    })
+    const fromDisk = JSON.parse(readFileSync(join(dir, 'config.json'), 'utf-8'))
+    expect(fromDisk.customApps).toHaveLength(1)
+    expect(fromDisk.websites).toHaveLength(1)
+    expect(fromDisk.fileFolders).toHaveLength(2)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('persists an empty array to remove items', () => {
+    const { store, file } = makeStore()
+    store.update({ favorites: ['app-chrome'] })
+    store.update({ favorites: [] })
+    const fromDisk = JSON.parse(readFileSync(file, 'utf-8'))
+    expect(fromDisk.favorites).toEqual([])
+  })
+
+  it('migrates a pre-v1 config and backfills new fields from defaults', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nova-config-'))
+    const file = join(dir, 'config.json')
+    writeFileSync(file, JSON.stringify({ version: 0, hotkey: 'Alt+D' }), 'utf-8')
+    const store = createConfigStore(file)
+    const config = store.get()
+    expect(config.version).toBe(1)
+    expect(config.hotkey).toBe('Alt+D')
+    expect(config.favorites).toEqual([])
+    expect(config.websites.length).toBeGreaterThan(0)
+    expect(config.startup).toBe(false)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('drops unknown keys and wrong-typed values from a config patch', () => {
+    const patch = sanitizeConfigPatch({
+      hotkey: 42,
+      alwaysOnTop: 'yes',
+      exec: 'calc.exe',
+      position: { displayId: '0', x: 10, y: 20 },
+    })
+    expect(patch.hotkey).toBeUndefined()
+    expect(patch.alwaysOnTop).toBeUndefined()
+    expect((patch as Record<string, unknown>)['exec']).toBeUndefined()
+    expect(patch.position).toBeUndefined()
+  })
+
+  it('filters malformed favorites, custom apps, websites and shortcuts', () => {
+    const patch = sanitizeConfigPatch({
+      favorites: ['ok', 3, null],
+      customApps: [
+        { id: 'a', name: 'A', aliases: ['a'], path: 'C:\\a.exe' },
+        { id: 'bad' },
+        'nope',
+      ],
+      websites: [
+        { id: 'w', name: 'W', aliases: ['w'], url: 'https://w.io' },
+        { id: 'bad2', name: 'X', url: 7 },
+      ],
+      fileFolders: [
+        { id: 'f', name: 'F', path: 'C:\\F', kind: 'file' },
+        { id: 'f2', name: 'F2', path: 'C:\\F2', kind: 'link' },
+      ],
+    })
+    expect(patch.favorites).toEqual(['ok'])
+    expect(patch.customApps).toHaveLength(1)
+    expect(patch.websites).toHaveLength(1)
+    expect(patch.fileFolders).toHaveLength(1)
+  })
+
+  it('accepts a well-formed position patch', () => {
+    const patch = sanitizeConfigPatch({ position: { displayId: 1, x: 120, y: 340 } })
+    expect(patch.position).toEqual({ displayId: 1, x: 120, y: 340 })
+  })
+})
