@@ -72,6 +72,11 @@ export interface NovaConfig {
   customApps: AppEntry[]
   websites: WebsiteEntry[]
   fileFolders: FileFolderEntry[]
+  /**
+   * Whether the default Windows folder shortcuts (Downloads/Documents/Desktop)
+   * have been seeded into fileFolders. Guarantees they are added only once.
+   */
+  defaultsSeeded: boolean
 }
 
 export interface LaunchResult {
@@ -115,5 +120,6 @@ export function defaultConfig(): NovaConfig {
       { id: 'web-google', name: 'Google', aliases: ['google', 'search'], url: 'https://www.google.com' },
     ],
     fileFolders: [],
+    defaultsSeeded: false,
   }
 }

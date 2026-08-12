@@ -67,6 +67,9 @@ export function sanitizeConfigPatch(patch: Record<string, unknown>): Partial<Nov
         (v['kind'] === 'file' || v['kind'] === 'folder'),
     )
   }
+  if (typeof patch['defaultsSeeded'] === 'boolean') {
+    out.defaultsSeeded = patch['defaultsSeeded']
+  }
   if (isRecord(patch['position'])) {
     const pos = patch['position']
     if (

@@ -58,7 +58,14 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     if (patch.alwaysOnTop !== undefined && manager.dotWindow) {
       manager.dotWindow.setAlwaysOnTop(next.alwaysOnTop, 'pop-up-menu')
     }
-    if (patch.customApps !== undefined) {
+    // The registry snapshot is built from customApps + websites + fileFolders.
+    // Invalidate it whenever any of those groups changes so the overlay and
+    // command engine see live updates without a restart.
+    if (
+      patch.customApps !== undefined ||
+      patch.websites !== undefined ||
+      patch.fileFolders !== undefined
+    ) {
       registry.setConfig(next)
       registry.invalidate()
     }

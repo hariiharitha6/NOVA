@@ -119,11 +119,33 @@ export function CommandOverlay() {
         }}
       >
         <div style={{ padding: '18px 22px 10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: '#a78bfa', fontWeight: 600, fontSize: 13, letterSpacing: '0.08em' }}>
-              NOVA
-            </span>
-            <span style={{ color: 'rgba(148,163,184,0.6)', fontSize: 12 }}>{formatAccelerator(hotkey)} to toggle</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: '#a78bfa', fontWeight: 600, fontSize: 13, letterSpacing: '0.08em' }}>
+                NOVA
+              </span>
+              <span style={{ color: 'rgba(148,163,184,0.6)', fontSize: 12 }}>{formatAccelerator(hotkey)} to toggle</span>
+            </div>
+            <button
+              className="glass-hover"
+              aria-label="Open settings"
+              title="Settings"
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: 'rgba(148,163,184,0.9)',
+                borderRadius: 8,
+                padding: '4px 10px',
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+              onClick={() => {
+                window.nova.hideOverlay()
+                window.nova.toggleSettings()
+              }}
+            >
+              ⚙
+            </button>
           </div>
         </div>
 

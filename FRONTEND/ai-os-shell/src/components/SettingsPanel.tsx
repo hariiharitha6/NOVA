@@ -47,6 +47,7 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       className="glass-hover"
+      aria-label="Remove"
       style={{
         background: 'rgba(255,255,255,0.04)',
         border: '1px solid rgba(255,255,255,0.08)',

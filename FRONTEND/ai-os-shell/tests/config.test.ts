@@ -151,4 +151,64 @@ describe('createConfigStore', () => {
     const patch = sanitizeConfigPatch({ position: { displayId: 1, x: 120, y: 340 } })
     expect(patch.position).toEqual({ displayId: 1, x: 120, y: 340 })
   })
+
+  it('persists the hotkey across reloads', () => {
+    const { store, file, dir } = makeStore()
+    store.update({ hotkey: 'Alt+D' })
+    const fromDisk = JSON.parse(readFileSync(file, 'utf-8'))
+    expect(fromDisk.hotkey).toBe('Alt+D')
+    const again = createConfigStore(file)
+    expect(again.get().hotkey).toBe('Alt+D')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('persists the startup flag across reloads', () => {
+    const { store, file, dir } = makeStore()
+    store.update({ startup: true })
+    const fromDisk = JSON.parse(readFileSync(file, 'utf-8'))
+    expect(fromDisk.startup).toBe(true)
+    const again = createConfigStore(file)
+    expect(again.get().startup).toBe(true)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('accepts and persists the defaultsSeeded flag', () => {
+    const { store, file, dir } = makeStore()
+    store.update({ defaultsSeeded: true })
+    const fromDisk = JSON.parse(readFileSync(file, 'utf-8'))
+    expect(fromDisk.defaultsSeeded).toBe(true)
+    const again = createConfigStore(file)
+    expect(again.get().defaultsSeeded).toBe(true)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('drops a malformed defaultsSeeded patch', () => {
+    const patch = sanitizeConfigPatch({ defaultsSeeded: 'yes' })
+    expect(patch.defaultsSeeded).toBeUndefined()
+    const ok = sanitizeConfigPatch({ defaultsSeeded: false })
+    expect(ok.defaultsSeeded).toBe(false)
+  })
+
+  it('defaults defaultsSeeded to false (pre-seed migration)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nova-config-'))
+    const file = join(dir, 'config.json')
+    writeFileSync(file, JSON.stringify({ version: 1, fileFolders: [] }), 'utf-8')
+    const store = createConfigStore(file)
+    expect(store.get().defaultsSeeded).toBe(false)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('seeded file folders are persisted as part of fileFolders', () => {
+    const { store, dir } = makeStore()
+    store.update({
+      fileFolders: [
+        { id: 'folder-downloads', name: 'Downloads', path: 'C:\\Downloads', kind: 'folder' },
+      ],
+      defaultsSeeded: true,
+    })
+    const fromDisk = JSON.parse(readFileSync(join(dir, 'config.json'), 'utf-8'))
+    expect(fromDisk.fileFolders).toHaveLength(1)
+    expect(fromDisk.defaultsSeeded).toBe(true)
+    rmSync(dir, { recursive: true, force: true })
+  })
 })

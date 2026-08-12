@@ -5,6 +5,7 @@ import { createConfigStore } from './core/config'
 import { AppRegistry } from './core/app-registry'
 import { WindowsAppSource } from './platform/windows-app-source'
 import { createWindowsLauncher } from './platform/windows-launcher'
+import { seedDefaultFileFolders } from './platform/windows-shortcuts'
 import { createWindowManager } from './windows'
 import { registerHotkey, unregisterHotkey } from './hotkey'
 import { registerIpcHandlers } from './ipc'
@@ -30,6 +31,7 @@ if (!gotTheLock) {
     })
 
     const configStore = createConfigStore(join(app.getPath('userData'), 'nova-config.json'))
+    seedDefaultFileFolders(configStore)
     const registry = new AppRegistry({
       sources: [new WindowsAppSource()],
       config: configStore.get(),

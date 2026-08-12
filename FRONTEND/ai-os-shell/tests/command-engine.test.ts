@@ -23,6 +23,9 @@ const registry: CommandSource = {
   ],
   fileFolders: [
     { id: 'folder-downloads', name: 'Downloads', path: 'C:\\Users\\me\\Downloads', kind: 'folder' },
+    { id: 'folder-documents', name: 'Documents', path: 'C:\\Users\\me\\Documents', kind: 'folder' },
+    { id: 'folder-desktop', name: 'Desktop', path: 'C:\\Users\\me\\Desktop', kind: 'folder' },
+    { id: 'file-report', name: 'Report', path: 'C:\\Users\\me\\report.pdf', kind: 'file' },
   ],
 }
 
@@ -70,6 +73,24 @@ describe('resolveCommand', () => {
     const action = resolveCommand('Open Downloads', registry)
     expect(action.intent).toBe('OPEN_FOLDER')
     expect(action.target).toBe('C:\\Users\\me\\Downloads')
+  })
+
+  it('resolves the default Documents folder', () => {
+    const action = resolveCommand('Open Documents', registry)
+    expect(action.intent).toBe('OPEN_FOLDER')
+    expect(action.target).toBe('C:\\Users\\me\\Documents')
+  })
+
+  it('resolves the default Desktop folder', () => {
+    const action = resolveCommand('Open Desktop', registry)
+    expect(action.intent).toBe('OPEN_FOLDER')
+    expect(action.target).toBe('C:\\Users\\me\\Desktop')
+  })
+
+  it('resolves a file by name', () => {
+    const action = resolveCommand('Open Report', registry)
+    expect(action.intent).toBe('OPEN_FILE')
+    expect(action.target).toBe('C:\\Users\\me\\report.pdf')
   })
 
   it('returns a clarification with suggestions for an unknown app', () => {
