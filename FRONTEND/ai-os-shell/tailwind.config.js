@@ -8,13 +8,14 @@ module.exports = {
     extend: {
       colors: {
         shell: {
-          bg: 'rgba(8, 8, 20, 0.80)',
-          border: 'rgba(139, 92, 246, 0.20)',
-          accent: '#6366f1',
-          accent2: '#8b5cf6',
-          text: '#f1f5f9',
-          muted: '#94a3b8',
-          glow: '#6366f1',
+          bg: 'rgba(21, 16, 33, 0.86)',
+          border: 'rgba(168, 85, 247, 0.16)',
+          accent: '#7C3AED',
+          accent2: '#A855F7',
+          highlight: '#C084FC',
+          text: '#F5F3FF',
+          muted: '#A8A0B8',
+          glow: '#7C3AED',
         }
       },
       fontFamily: {
@@ -51,12 +52,12 @@ module.exports = {
         }
       },
       boxShadow: {
-        'glow-sm': '0 0 12px rgba(99, 102, 241, 0.3)',
-        'glow': '0 0 24px rgba(99, 102, 241, 0.4)',
-        'glow-lg': '0 0 48px rgba(99, 102, 241, 0.5)',
-        'glow-xl': '0 0 80px rgba(99, 102, 241, 0.6)',
-        'glass': '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.08)',
-        'glass-lg': '0 16px 64px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.10)',
+        'glow-sm': '0 0 12px rgba(124, 58, 237, 0.3)',
+        'glow': '0 0 24px rgba(124, 58, 237, 0.4)',
+        'glow-lg': '0 0 48px rgba(168, 85, 247, 0.45)',
+        'glow-xl': '0 0 80px rgba(168, 85, 247, 0.55)',
+        'glass': '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.06)',
+        'glass-lg': '0 16px 64px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.08)',
       },
     }
   },

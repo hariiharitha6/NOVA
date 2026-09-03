@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createConfigStore, sanitizeConfigPatch } from '../electron/core/config'
 import { defaultConfig } from '../electron/core/types'
+import { DEFAULT_HOTKEY, DEFAULT_PTT_HOTKEY } from '../electron/core/shortcut-policy'
+import { migrateShortcutDefaults, decideShortcutChange } from '../electron/core/shortcut-policy'
 
 function makeStore() {
   const dir = mkdtempSync(join(tmpdir(), 'nova-config-'))
@@ -18,9 +20,19 @@ describe('createConfigStore', () => {
     expect(store.get()).toEqual(defaultConfig())
   })
 
-  it('defaults hotkey to Control+Space', () => {
+  it('defaults hotkey to Control+J', () => {
     const { store } = makeStore()
-    expect(store.get().hotkey).toBe('Control+Space')
+    expect(store.get().hotkey).toBe('Control+J')
+  })
+
+  it('defaults the voice PTT hotkey to Control+Shift+J', () => {
+    const { store } = makeStore()
+    expect(store.get().pttHotkey).toBe('Control+Shift+J')
+  })
+
+  it('defaults shortcutsMigratedV2 to false', () => {
+    const { store } = makeStore()
+    expect(store.get().shortcutsMigratedV2).toBe(false)
   })
 
   it('persists updates and reloads them from disk', () => {
@@ -35,7 +47,7 @@ describe('createConfigStore', () => {
     const { store } = makeStore()
     const next = store.update({ startup: true })
     expect(next.startup).toBe(true)
-    expect(next.hotkey).toBe('Control+Space')
+    expect(next.hotkey).toBe('Control+J')
   })
 
   it('records recents, dedupes, and caps at 10', () => {
@@ -210,5 +222,77 @@ describe('createConfigStore', () => {
     expect(fromDisk.fileFolders).toHaveLength(1)
     expect(fromDisk.defaultsSeeded).toBe(true)
     rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('defaultConfig returns a complete NovaConfig with all v0.2 fields', () => {
+    const cfg = defaultConfig()
+    expect(cfg.hotkey).toBe(DEFAULT_HOTKEY)
+    expect(cfg.pttHotkey).toBe(DEFAULT_PTT_HOTKEY)
+    expect(cfg.voiceEnabled).toBe(false)
+    expect(cfg.speechLanguage).toBe('en-US')
+    expect(cfg.shortcutsMigratedV2).toBe(false)
+    expect(cfg.version).toBe(1)
+    expect(cfg.defaultsSeeded).toBe(false)
+  })
+})
+
+describe('shortcut migration (Slice 3A)', () => {
+  it('migrates legacy Control+Space defaults to Control+J', () => {
+    const patch = migrateShortcutDefaults({ version: 1, hotkey: 'Control+Space', pttHotkey: 'Control+Shift+Space' })
+    expect(patch.hotkey).toBe('Control+J')
+    expect(patch.pttHotkey).toBe('Control+Shift+J')
+    expect(patch.shortcutsMigratedV2).toBe(true)
+  })
+
+  it('does not overwrite custom shortcuts during migration', () => {
+    const patch = migrateShortcutDefaults({ version: 1, hotkey: 'Alt+D', pttHotkey: 'Control+Shift+Space' })
+    expect(patch.hotkey).toBeUndefined()
+    expect(patch.pttHotkey).toBe('Control+Shift+J')
+    expect(patch.shortcutsMigratedV2).toBe(true)
+  })
+
+  it('does not migrate when already migrated (idempotent)', () => {
+    const patch = migrateShortcutDefaults({ version: 1, hotkey: 'Control+Space', pttHotkey: 'Control+Shift+Space', shortcutsMigratedV2: true })
+    expect(patch).toEqual({})
+  })
+
+  it('returns a flag-only patch when nothing needs migrating but not yet migrated', () => {
+    const patch = migrateShortcutDefaults({ version: 1, hotkey: 'Control+J', pttHotkey: 'Control+Shift+J' })
+    expect(patch.hotkey).toBeUndefined()
+    expect(patch.pttHotkey).toBeUndefined()
+    expect(patch.shortcutsMigratedV2).toBe(true)
+  })
+})
+
+describe('shortcut conflict protection (Slice 3A)', () => {
+  it('rejects a NOVA hotkey that collides with the PTT hotkey', () => {
+    const decision = decideShortcutChange('Control+Shift+J', 'Control+J', 'Control+Shift+J', () => true)
+    expect(decision.accepted).toBe(false)
+    expect(decision.effective).toBe('Control+J')
+    expect(decision.reason).toBeTruthy()
+  })
+
+  it('rejects a PTT hotkey that collides with the NOVA hotkey', () => {
+    const decision = decideShortcutChange('Control+J', 'Control+Shift+J', 'Control+J', () => true)
+    expect(decision.accepted).toBe(false)
+    expect(decision.effective).toBe('Control+Shift+J')
+  })
+
+  it('accepts a valid, free shortcut', () => {
+    const decision = decideShortcutChange('Alt+Z', 'Control+J', 'Control+Shift+J', () => true)
+    expect(decision.accepted).toBe(true)
+    expect(decision.effective).toBe('Alt+Z')
+  })
+
+  it('accepts a change equal to the current shortcut (no-op)', () => {
+    const decision = decideShortcutChange('Control+J', 'Control+J', 'Control+Shift+J', () => false)
+    expect(decision.accepted).toBe(true)
+    expect(decision.effective).toBe('Control+J')
+  })
+
+  it('rejects a shortcut when the OS refuses registration', () => {
+    const decision = decideShortcutChange('Alt+Z', 'Control+J', 'Control+Shift+J', () => false)
+    expect(decision.accepted).toBe(false)
+    expect(decision.effective).toBe('Control+J')
   })
 })

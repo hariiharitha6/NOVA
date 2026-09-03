@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 import type { CommandResponse, DisplayInfo, NovaConfig, RegistrySnapshot } from '../electron/core/types'
+import type { VoiceState } from '../electron/core/speech/types'
 
 interface ImportMetaEnv {
   readonly ELECTRON_RENDERER_URL: string
@@ -35,8 +36,12 @@ declare global {
       moveDotBy(dx: number, dy: number): void
       moveDotEnd(): void
       quit(): void
+      voiceStatus(): Promise<VoiceState>
+      voiceSendAudio(samples: Float32Array): void
+      voiceMicError(message: string): void
       onOverlayShown(cb: () => void): () => void
       onConfigChanged(cb: (config: NovaConfig) => void): () => void
+      onVoiceState(cb: (state: VoiceState) => void): () => void
     }
   }
 }

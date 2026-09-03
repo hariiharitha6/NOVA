@@ -9,6 +9,8 @@ import type {
 } from '../../electron/core/types'
 import { normalizeUrl } from '../../electron/core/url'
 import { acceleratorFromKeys, blockedAcceleratorReason, formatAccelerator } from '../lib/accelerator'
+import { DEFAULT_HOTKEY, DEFAULT_PTT_HOTKEY } from '../../electron/core/shortcut-policy'
+import { NovaLogo } from './NovaLogo'
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
@@ -16,7 +18,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
       className="toggle-track"
       role="switch"
       aria-checked={checked}
-      style={{ background: checked ? 'rgba(139,92,246,0.7)' : 'rgba(255,255,255,0.1)' }}
+      style={{ background: checked ? 'rgba(168,85,247,0.7)' : 'rgba(255,255,255,0.1)' }}
       onClick={onChange}
     >
       <span className="toggle-thumb" style={{ transform: checked ? 'translateX(16px)' : 'translateX(0)' }} />
@@ -71,6 +73,7 @@ export function SettingsPanel() {
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
   const [startup, setStartup] = useState(false)
   const [recording, setRecording] = useState(false)
+  const [recordingPtt, setRecordingPtt] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [webName, setWebName] = useState('')
   const [webUrl, setWebUrl] = useState('')
@@ -119,11 +122,42 @@ export function SettingsPanel() {
       const acc = acceleratorFromKeys(e)
       if (!acc) return
       setRecording(false)
-      void save({ hotkey: acc }).then(() => toast(`Hotkey set to ${formatAccelerator(acc)}`))
+      void save({ hotkey: acc }).then((next) => {
+        if (next.hotkey !== acc) {
+          toast(`Conflicts with voice shortcut — keeping ${formatAccelerator(next.hotkey)}`)
+        } else {
+          toast(`Hotkey set to ${formatAccelerator(acc)}`)
+        }
+      })
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [recording, save, toast])
+
+  useEffect(() => {
+    if (!recordingPtt) return
+    function onKey(e: KeyboardEvent): void {
+      e.preventDefault()
+      e.stopPropagation()
+      const reason = blockedAcceleratorReason(e)
+      if (reason) {
+        toast(reason)
+        return
+      }
+      const acc = acceleratorFromKeys(e)
+      if (!acc) return
+      setRecordingPtt(false)
+      void save({ pttHotkey: acc }).then((next) => {
+        if (next.pttHotkey !== acc) {
+          toast(`Conflicts with NOVA shortcut — keeping ${formatAccelerator(next.pttHotkey)}`)
+        } else {
+          toast(`PTT hotkey set to ${formatAccelerator(acc)}`)
+        }
+      })
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [recordingPtt, save, toast])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
@@ -234,8 +268,11 @@ export function SettingsPanel() {
             flexShrink: 0,
           }}
         >
-          <span style={{ color: '#a78bfa', fontWeight: 600, fontSize: 13, letterSpacing: '0.08em' }}>
-            NOVA SETTINGS
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <NovaLogo size={16} variant="gradient" decorative />
+            <span style={{ color: 'var(--nova-royal, #a855f7)', fontWeight: 600, fontSize: 13, letterSpacing: '0.08em' }}>
+              NOVA SETTINGS
+            </span>
           </span>
           <button
             className="glass-hover"
@@ -296,6 +333,41 @@ export function SettingsPanel() {
               >
                 {recording ? 'Listening…' : 'Change'}
               </button>
+            </div>
+          </Section>
+
+          <Section title="Voice">
+            <div className="glass-light" style={{ borderRadius: 14, padding: '14px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>Voice commands</div>
+                  <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.7)' }}>
+                    Hands-free control. Speech stays on your device.
+                  </div>
+                </div>
+                <Toggle
+                  checked={config.voiceEnabled}
+                  onChange={() => void save({ voiceEnabled: !config.voiceEnabled })}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>
+                    {recordingPtt ? 'Press a new shortcut…' : formatAccelerator(config.pttHotkey)}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.7)' }}>Hold to talk (push-to-talk)</div>
+                </div>
+                <button
+                  className="quick-action-btn"
+                  style={{ minWidth: 0, padding: '8px 14px', borderRadius: 999, color: recordingPtt ? '#fbbf24' : '#c4b5fd' }}
+                  onClick={() => setRecordingPtt((r) => !r)}
+                >
+                  {recordingPtt ? 'Listening…' : 'Change'}
+                </button>
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.6)', marginTop: 10 }}>
+                First use downloads a small offline speech model (~50 MB).
+              </div>
             </div>
           </Section>
 
@@ -443,9 +515,9 @@ export function SettingsPanel() {
               bottom: 20,
               left: '50%',
               transform: 'translateX(-50%)',
-              background: 'rgba(8,8,24,0.9)',
-              border: '1px solid rgba(139,92,246,0.4)',
-              color: '#e9d5ff',
+              background: 'var(--nova-surface-glass, rgba(21,16,33,0.9))',
+              border: '1px solid var(--nova-border-strong, rgba(168,85,247,0.4))',
+              color: 'var(--nova-highlight, #e9d5ff)',
               borderRadius: 999,
               padding: '8px 18px',
               fontSize: 13,

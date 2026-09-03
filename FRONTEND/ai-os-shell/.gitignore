@@ -4,3 +4,8 @@ out/
 *.log
 .DS_Store
 Thumbs.db
+
+# Large speech model binaries are kept locally and excluded from git (some
+# exceed GitHub's 100 MB per-file limit). Download/extract them into
+# resources/models/ before packaging with `npm run package:win`.
+resources/models/

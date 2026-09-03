@@ -3,12 +3,14 @@
 import { app, ipcMain, BrowserWindow, dialog, screen } from 'electron'
 import { basename, extname } from 'node:path'
 import type { AppRegistry } from './core/app-registry'
-import { resolveCommand } from './core/command-engine'
 import { sanitizeConfigPatch } from './core/config'
+import { executeCommand } from './core/command-pipeline'
 import type { Launcher } from './core/launcher'
-import type { ConfigStore, DisplayInfo } from './core/types'
+import type { ConfigStore, DisplayInfo, NovaConfig } from './core/types'
+import type { VoiceController } from './core/speech/voice-controller'
 import type { WindowManager } from './windows'
-import { registerHotkey } from './hotkey'
+import { registerHotkey, registerPttHotkey, unregisterEscapeCancel, unregisterPttHotkey } from './hotkey'
+import { decideShortcutChange } from './core/shortcut-policy'
 import { registerStartup, unregisterStartup, isStartupEnabled } from './startup'
 
 export interface IpcDeps {
@@ -16,9 +18,8 @@ export interface IpcDeps {
   registry: AppRegistry
   launcher: Launcher
   manager: WindowManager
+  voice: VoiceController
 }
-
-const MAX_INPUT_LENGTH = 200
 
 interface PickedPath {
   path: string
@@ -29,15 +30,53 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function broadcastConfig(configStore: ConfigStore): void {
+function isFloat32Array(value: unknown): value is Float32Array {
+  return (
+    value instanceof Float32Array ||
+    (ArrayBuffer.isView(value) && (value as unknown as { BYTES_PER_ELEMENT: number }).BYTES_PER_ELEMENT === 4)
+  )
+}
+
+export function broadcastConfig(configStore: ConfigStore): void {
   const config = configStore.get()
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send('nova:config-changed', config)
   }
 }
 
+/** (Re)apply the PTT registration from config. Reverts to the previous working
+ * shortcut when the requested one cannot be registered. Returns the config. */
+function applyVoiceHotkey(
+  configStore: ConfigStore,
+  voice: VoiceController,
+  prev: NovaConfig,
+): NovaConfig {
+  const cfg = configStore.get()
+  if (!cfg.voiceEnabled) {
+    unregisterPttHotkey()
+    unregisterEscapeCancel()
+    voice.setEnabled(false)
+    return cfg
+  }
+  const ok = registerPttHotkey(cfg.pttHotkey, () => voice.togglePtt())
+  if (!ok) {
+    configStore.update({ pttHotkey: prev.pttHotkey })
+    registerPttHotkey(configStore.get().pttHotkey, () => voice.togglePtt())
+    return configStore.get()
+  }
+  voice.setEnabled(true)
+  return configStore.get()
+}
+
 export function registerIpcHandlers(deps: IpcDeps): void {
-  const { configStore, registry, launcher, manager } = deps
+  const { configStore, registry, launcher, manager, voice } = deps
+
+  const pipeline = {
+    registry,
+    launcher,
+    configStore,
+    onRecent: () => broadcastConfig(configStore),
+  }
 
   ipcMain.handle('nova:config-get', () => configStore.get())
 
@@ -45,6 +84,40 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     if (!isRecord(raw)) return configStore.get()
     const prev = configStore.get()
     const patch = sanitizeConfigPatch(raw)
+
+    // Overlay hotkey change — check for conflict with the PTT shortcut.
+    if (patch.hotkey && patch.hotkey !== prev.hotkey) {
+      const decision = decideShortcutChange(
+        patch.hotkey,
+        prev.hotkey,
+        prev.pttHotkey,
+        (acc) => registerHotkey(acc, manager),
+      )
+      patch.hotkey = decision.effective
+      if (!decision.accepted) {
+        broadcastConfig(configStore)
+        return configStore.get()
+      }
+    }
+
+    // PTT hotkey change — check for conflict with the overlay shortcut.
+    if (patch.pttHotkey && patch.pttHotkey !== prev.pttHotkey) {
+      const decision = decideShortcutChange(
+        patch.pttHotkey,
+        prev.pttHotkey,
+        prev.hotkey,
+        (acc) => {
+          unregisterPttHotkey()
+          return registerPttHotkey(acc, () => voice.togglePtt())
+        },
+      )
+      patch.pttHotkey = decision.effective
+      if (!decision.accepted) {
+        broadcastConfig(configStore)
+        return configStore.get()
+      }
+    }
+
     const next = configStore.update(patch)
     if (patch.hotkey) {
       const ok = registerHotkey(next.hotkey, manager)
@@ -57,6 +130,11 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     }
     if (patch.alwaysOnTop !== undefined && manager.dotWindow) {
       manager.dotWindow.setAlwaysOnTop(next.alwaysOnTop, 'pop-up-menu')
+    }
+    if (patch.voiceEnabled !== undefined || patch.pttHotkey) {
+      const applied = applyVoiceHotkey(configStore, voice, prev)
+      broadcastConfig(configStore)
+      return applied
     }
     // The registry snapshot is built from customApps + websites + fileFolders.
     // Invalidate it whenever any of those groups changes so the overlay and
@@ -73,28 +151,14 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     return next
   })
 
-  ipcMain.handle('nova:run-command', async (_event, raw: unknown) => {
-    if (typeof raw !== 'string' || raw.trim().length === 0 || raw.length > MAX_INPUT_LENGTH) {
+  ipcMain.handle('nova:run-command', (_event, raw: unknown) => {
+    if (typeof raw !== 'string') {
       return {
         kind: 'clarification',
         action: { intent: 'CLARIFICATION', target: '', label: 'Invalid command.' },
       }
     }
-    const input = raw.trim()
-    const snapshot = await registry.snapshot()
-    const action = resolveCommand(input, snapshot)
-    if (action.intent === 'CLARIFICATION') {
-      return { kind: 'clarification', action }
-    }
-    const result = await launcher.launch(action)
-    if (result.ok) {
-      configStore.recordRecent({
-        id: `${action.intent.toLowerCase()}:${action.target}`,
-        label: action.label,
-      })
-      broadcastConfig(configStore)
-    }
-    return { kind: 'launched', action, result }
+    return executeCommand(raw, pipeline)
   })
 
   ipcMain.handle('nova:registry', () => registry.snapshot())
@@ -135,6 +199,19 @@ export function registerIpcHandlers(deps: IpcDeps): void {
   ipcMain.handle('nova:dot-place-display', (_event, displayId: unknown): boolean => {
     if (typeof displayId !== 'number') return false
     return manager.placeDotOnDisplay(displayId)
+  })
+
+  // ─── Voice IPC ───────────────────────────────────────────────────────────
+
+  ipcMain.handle('nova:voice-status', () => voice.getState())
+
+  ipcMain.on('nova:voice-audio', (_event, samples: unknown) => {
+    if (!isFloat32Array(samples)) return
+    voice.acceptAudio(samples as Float32Array)
+  })
+
+  ipcMain.on('nova:voice-mic-error', (_event, message: unknown) => {
+    voice.micError(typeof message === 'string' && message ? message : 'microphone error')
   })
 
   async function pickPath(

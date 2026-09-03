@@ -4,6 +4,8 @@ import { useNovaBridge } from '../hooks/useNovaBridge'
 import type { Feedback } from '../store/useNovaStore'
 import type { NovaConfig, RegistrySnapshot } from '../../electron/core/types'
 import { formatAccelerator } from '../lib/accelerator'
+import { DEFAULT_HOTKEY } from '../../electron/core/shortcut-policy'
+import { NovaLogo } from './NovaLogo'
 
 const PLACEHOLDER = "What do you want to do?"
 
@@ -11,7 +13,7 @@ export function CommandOverlay() {
   const [input, setInput] = useState('')
   const [feedback, setFeedback] = useState<Feedback>(null)
   const [busy, setBusy] = useState(false)
-  const [hotkey, setHotkey] = useState('Control+Space')
+  const [hotkey, setHotkey] = useState<string>(DEFAULT_HOTKEY)
   const [recents, setRecents] = useState<{ id: string; label: string }[]>([])
   const [favorites, setFavorites] = useState<string[]>([])
   const [websites, setWebsites] = useState<NovaConfig['websites']>([])
@@ -22,7 +24,30 @@ export function CommandOverlay() {
     inputRef.current?.focus()
   }, [])
 
-  useNovaBridge(focusInput)
+  const resetSession = useCallback(() => {
+    // Each launcher invocation must start from a fresh, useful state: clear any
+    // previous result/error/query/loading so it never leaks into the next open.
+    // Persistent data (recents/favorites/settings) is NOT cleared here.
+    setFeedback(null)
+    setBusy(false)
+    setInput('')
+  }, [])
+
+  useNovaBridge(
+    useCallback(() => {
+      resetSession()
+      focusInput()
+      // Re-fetch so suggestions (recents/favorites) are current on every open.
+      window.nova
+        .getConfig()
+        .then(applyConfig)
+        .catch(() => {})
+      window.nova
+        .getRegistry()
+        .then(applyRegistry)
+        .catch(() => {})
+    }, [resetSession, focusInput]),
+  )
 
   useEffect(() => {
     focusInput()
@@ -50,7 +75,7 @@ export function CommandOverlay() {
     setRecents(config.recents)
     setFavorites(config.favorites)
     setWebsites(config.websites)
-    setHotkey(config.hotkey)
+    setHotkey(config.hotkey && config.hotkey.trim() ? config.hotkey : DEFAULT_HOTKEY)
   }
 
   function applyRegistry(reg: RegistrySnapshot): void {
@@ -121,7 +146,8 @@ export function CommandOverlay() {
         <div style={{ padding: '18px 22px 10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ color: '#a78bfa', fontWeight: 600, fontSize: 13, letterSpacing: '0.08em' }}>
+              <NovaLogo size={18} variant="gradient" decorative />
+              <span style={{ color: 'var(--nova-royal, #a855f7)', fontWeight: 600, fontSize: 13, letterSpacing: '0.08em' }}>
                 NOVA
               </span>
               <span style={{ color: 'rgba(148,163,184,0.6)', fontSize: 12 }}>{formatAccelerator(hotkey)} to toggle</span>

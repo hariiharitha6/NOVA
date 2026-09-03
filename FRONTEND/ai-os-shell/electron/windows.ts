@@ -11,6 +11,8 @@ const OVERLAY_HEIGHT = 360
 const SETTINGS_WIDTH = 720
 const SETTINGS_HEIGHT = 600
 const MARGIN = 16
+const VOICE_WIDTH = 360
+const VOICE_HEIGHT = 148
 
 export interface WindowManager {
   readonly dotWindow: BrowserWindow | null
@@ -25,6 +27,8 @@ export interface WindowManager {
   placeDotOnDisplay(displayId: number): boolean
   moveDotBy(dx: number, dy: number): void
   persistDotPosition(): void
+  /** Grow/shrink the dot window into the voice indicator bubble. */
+  setVoiceMode(active: boolean): void
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -52,6 +56,8 @@ export function createWindowManager(configStore: ConfigStore): WindowManager {
   let dot: BrowserWindow | null = null
   let overlay: BrowserWindow | null = null
   let settings: BrowserWindow | null = null
+  let voiceActive = false
+  let voiceAnchor: { x: number; y: number } | null = null
 
   function initialDotPosition(): { x: number; y: number } {
     const saved: WindowPosition | null = configStore.get().position
@@ -221,7 +227,12 @@ export function createWindowManager(configStore: ConfigStore): WindowManager {
       screen.on('display-removed', clampDotToDisplay)
     },
     showOverlay() {
-      if (!overlay || overlay.isDestroyed()) overlay = createOverlayWindow()
+      // Keep the overlay window alive after first creation; show/hide instead of
+      // recreating to improve perceived opening latency. The window is destroyed
+      // by Electron on quit or if the renderer crashes, in which case we recreate.
+      if (!overlay || overlay.isDestroyed() || overlay.webContents.isDestroyed()) {
+        overlay = createOverlayWindow()
+      }
       const { x, y } = overlayPosition()
       overlay.setPosition(x, y, true)
       overlay.show()
@@ -275,6 +286,31 @@ export function createWindowManager(configStore: ConfigStore): WindowManager {
       dot.setPosition(x, y, true)
       const position: WindowPosition = { displayId: display.id, x, y }
       configStore.update({ position })
+    },
+    setVoiceMode(active) {
+      if (!dot || dot.isDestroyed()) return
+      if (active === voiceActive) return
+      if (active) {
+        voiceActive = true
+        const [dx, dy] = dot.getPosition()
+        voiceAnchor = { x: dx, y: dy }
+        const display = screen.getDisplayMatching({ x: dx, y: dy, width: DOT_SIZE, height: DOT_SIZE })
+        const wa = display.workArea
+        const x = clamp(
+          Math.round(dx + DOT_SIZE / 2 - VOICE_WIDTH / 2),
+          wa.x,
+          wa.x + wa.width - VOICE_WIDTH,
+        )
+        let y = dy - VOICE_HEIGHT - 8
+        if (y < wa.y) y = dy + DOT_SIZE + 8
+        y = clamp(y, wa.y, wa.y + wa.height - VOICE_HEIGHT)
+        dot.setBounds({ x, y, width: VOICE_WIDTH, height: VOICE_HEIGHT })
+      } else {
+        voiceActive = false
+        const anchor = voiceAnchor ?? initialDotPosition()
+        voiceAnchor = null
+        dot.setBounds({ x: anchor.x, y: anchor.y, width: DOT_SIZE, height: DOT_SIZE })
+      }
     },
   }
 }

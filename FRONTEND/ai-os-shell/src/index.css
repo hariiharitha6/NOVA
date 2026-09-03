@@ -2,12 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ════════════════════════════════════════════════════════════
+   NOVA Royal Identity — design tokens
+   minimal · premium · futuristic · royal · dark
+   ════════════════════════════════════════════════════════════ */
+:root {
+  --nova-bg: #0b0712;
+  --nova-surface: #151021;
+  --nova-primary: #7c3aed;
+  --nova-royal: #a855f7;
+  --nova-highlight: #c084fc;
+  --nova-text: #f5f3ff;
+  --nova-muted: #a8a0b8;
+
+  --nova-surface-glass: rgba(21, 16, 33, 0.86);
+  --nova-border: rgba(168, 85, 247, 0.16);
+  --nova-border-strong: rgba(168, 85, 247, 0.38);
+  --nova-success: #34d399;
+  --nova-danger: #f87171;
+}
+
 /* ─── Global Reset ─────────────────────────────────────────── */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   width: 100%;
   height: 100%;
   background: transparent;
@@ -16,42 +40,44 @@ html, body, #root {
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  color: #f1f5f9;
+  color: var(--nova-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Glassmorphism Utilities ──────────────────────────────── */
+/* ─── Surfaces ─────────────────────────────────────────────── */
 @layer utilities {
   .glass {
-    background: rgba(8, 8, 24, 0.78);
-    backdrop-filter: blur(32px) saturate(180%);
-    -webkit-backdrop-filter: blur(32px) saturate(180%);
-    border: 1px solid rgba(139, 92, 246, 0.18);
+    background: var(--nova-surface-glass);
+    backdrop-filter: blur(28px) saturate(150%);
+    -webkit-backdrop-filter: blur(28px) saturate(150%);
+    border: 1px solid var(--nova-border);
+    box-shadow:
+      0 24px 64px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .glass-light {
-    background: rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(20px) saturate(150%);
-    -webkit-backdrop-filter: blur(20px) saturate(150%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(245, 243, 255, 0.03);
+    border: 1px solid rgba(245, 243, 255, 0.06);
   }
 
   .glass-hover {
-    transition: background 0.2s ease, border-color 0.2s ease;
+    transition:
+      background 0.18s ease,
+      border-color 0.18s ease,
+      color 0.18s ease;
   }
 
   .glass-hover:hover {
-    background: rgba(99, 102, 241, 0.12);
-    border-color: rgba(139, 92, 246, 0.35);
+    background: rgba(124, 58, 237, 0.14);
+    border-color: var(--nova-border-strong);
   }
 
-  .glow-text {
-    text-shadow: 0 0 20px rgba(139, 92, 246, 0.7);
-  }
-
-  .glow-border {
-    box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.4), 0 0 20px rgba(99, 102, 241, 0.15);
+  .royal-ring {
+    box-shadow:
+      0 0 0 1px var(--nova-border-strong),
+      0 0 24px rgba(124, 58, 237, 0.18);
   }
 
   .drag-region {
@@ -61,25 +87,9 @@ body {
   .no-drag {
     -webkit-app-region: no-drag;
   }
-
-  .shimmer-text {
-    background: linear-gradient(
-      90deg,
-      #a78bfa 0%,
-      #f1f5f9 35%,
-      #6366f1 50%,
-      #f1f5f9 65%,
-      #a78bfa 100%
-    );
-    background-size: 200% auto;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    animation: shimmer 3s linear infinite;
-  }
 }
 
-/* ─── Scrollbar Styles ─────────────────────────────────────── */
+/* ─── Scrollbar ────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -90,99 +100,97 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.4);
+  background: rgba(168, 85, 247, 0.35);
   border-radius: 2px;
 }
 
-/* ─── Custom Animations ────────────────────────────────────── */
-@keyframes orbPulse {
-  0%, 100% { transform: scale(1); opacity: 0.9; }
-  50% { transform: scale(1.08); opacity: 1; }
+/* ─── Motion (single home for every NOVA animation) ────────── */
+@keyframes nova-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
 }
 
-@keyframes orbRotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+@keyframes nova-listen {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(192, 132, 252, 0.85);
+  }
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
+@keyframes nova-orbit {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-4px); }
+@keyframes nova-flash {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
-@keyframes ripple {
-  0% { transform: scale(0.8); opacity: 1; }
-  100% { transform: scale(2.5); opacity: 0; }
+@keyframes nova-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-@keyframes fadeSlideUp {
-  0% { opacity: 0; transform: translateY(8px); }
-  100% { opacity: 1; transform: translateY(0); }
+.nova-anim-breathe {
+  animation: nova-breathe 3.2s ease-in-out infinite;
 }
 
-@keyframes scanLine {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100%); }
+.nova-anim-listen {
+  animation: nova-listen 1.4s ease-in-out infinite;
 }
 
-/* ─── Orb ─────────────────────────────────────────────────── */
-.orb-container {
-  position: relative;
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
+.nova-anim-orbit {
+  animation: nova-orbit 1.6s linear infinite;
 }
 
-.orb-core {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    #6366f1,
-    #8b5cf6,
-    #a78bfa,
-    #c4b5fd,
-    #8b5cf6,
-    #6366f1
-  );
-  animation: orbRotate 4s linear infinite;
+.nova-anim-flash {
+  animation: nova-flash 0.9s ease-out forwards;
 }
 
-.orb-inner {
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #1e1b4b, #0f0a1e);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.nova-anim-rise {
+  animation: nova-rise 0.16s ease-out both;
 }
 
-.orb-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #c4b5fd, #8b5cf6);
-  animation: orbPulse 2s ease-in-out infinite;
-  box-shadow: 0 0 8px rgba(139, 92, 246, 0.8);
-}
+/* Reduced motion: keep state colours, drop all movement. */
+@media (prefers-reduced-motion: reduce) {
+  .nova-anim-breathe,
+  .nova-anim-listen,
+  .nova-anim-orbit,
+  .nova-anim-flash,
+  .nova-anim-rise {
+    animation: none !important;
+  }
 
-.orb-ring {
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  animation: ripple 2.5s ease-out infinite;
-}
-
-.orb-ring-2 {
-  animation-delay: 1.2s;
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ─── Input ───────────────────────────────────────────────── */
@@ -190,81 +198,47 @@ body {
   background: transparent;
   border: none;
   outline: none;
-  color: #f1f5f9;
+  color: var(--nova-text);
   font-family: 'Inter', sans-serif;
   font-size: 13px;
   width: 100%;
-  caret-color: #8b5cf6;
+  caret-color: var(--nova-highlight);
 }
 
 .command-input::placeholder {
-  color: rgba(148, 163, 184, 0.5);
+  color: rgba(168, 160, 184, 0.55);
 }
 
-/* ─── Capsule Shell ───────────────────────────────────────── */
-.shell-capsule {
-  border-radius: 999px;
-  overflow: hidden;
-  position: relative;
-}
-
-.shell-expanded {
-  border-radius: 24px;
-  overflow: visible;
-}
-
-/* ─── Status Dots ─────────────────────────────────────────── */
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.status-dot.green {
-  background: #22c55e;
-  box-shadow: 0 0 6px rgba(34, 197, 94, 0.7);
-}
-
-.status-dot.amber {
-  background: #f59e0b;
-  box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);
-}
-
-.status-dot.red {
-  background: #ef4444;
-  box-shadow: 0 0 6px rgba(239, 68, 68, 0.7);
-}
-
-/* ─── Quick Action Buttons ────────────────────────────────── */
+/* ─── Quick Action Chips ──────────────────────────────────── */
 .quick-action-btn {
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
   padding: 12px 8px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(245, 243, 255, 0.04);
+  border: 1px solid rgba(245, 243, 255, 0.07);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  color: #94a3b8;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+  color: var(--nova-muted);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.02em;
   min-width: 64px;
 }
 
-.quick-action-btn:hover {
-  background: rgba(99, 102, 241, 0.15);
-  border-color: rgba(139, 92, 246, 0.35);
-  color: #c4b5fd;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.2);
+.quick-action-btn:hover,
+.quick-action-btn:focus-visible {
+  background: rgba(124, 58, 237, 0.16);
+  border-color: var(--nova-border-strong);
+  color: var(--nova-highlight);
+  outline: none;
 }
 
 .quick-action-btn:active {
-  transform: translateY(0);
+  background: rgba(124, 58, 237, 0.26);
 }
 
 /* ─── Toggle ──────────────────────────────────────────────── */
@@ -272,7 +246,7 @@ body {
   width: 36px;
   height: 20px;
   border-radius: 10px;
-  transition: background 0.2s ease;
+  transition: background 0.18s ease;
   position: relative;
   cursor: pointer;
   flex-shrink: 0;
@@ -285,23 +259,7 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: white;
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-/* ─── Progress Bar ────────────────────────────────────────── */
-.progress-bar {
-  height: 3px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-  width: 100%;
-}
-
-.progress-fill {
-  height: 100%;
-  border-radius: 2px;
-  background: linear-gradient(90deg, #6366f1, #8b5cf6);
-  transition: width 1s ease;
+  background: #f5f3ff;
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
 }

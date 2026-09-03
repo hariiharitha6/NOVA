@@ -70,6 +70,15 @@ export function sanitizeConfigPatch(patch: Record<string, unknown>): Partial<Nov
   if (typeof patch['defaultsSeeded'] === 'boolean') {
     out.defaultsSeeded = patch['defaultsSeeded']
   }
+  if (typeof patch['voiceEnabled'] === 'boolean') {
+    out.voiceEnabled = patch['voiceEnabled']
+  }
+  if (typeof patch['pttHotkey'] === 'string' && patch['pttHotkey'].length <= 50) {
+    out.pttHotkey = patch['pttHotkey']
+  }
+  if (typeof patch['speechLanguage'] === 'string' && patch['speechLanguage'].length <= 20) {
+    out.speechLanguage = patch['speechLanguage']
+  }
   if (isRecord(patch['position'])) {
     const pos = patch['position']
     if (

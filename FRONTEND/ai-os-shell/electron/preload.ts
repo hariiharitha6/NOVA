@@ -19,6 +19,9 @@ const nova = {
   moveDotBy: (dx: number, dy: number) => ipcRenderer.send('nova:dot-move', { dx, dy }),
   moveDotEnd: () => ipcRenderer.send('nova:dot-move-end'),
   quit: () => ipcRenderer.send('nova:quit'),
+  voiceStatus: () => ipcRenderer.invoke('nova:voice-status'),
+  voiceSendAudio: (samples: Float32Array) => ipcRenderer.send('nova:voice-audio', samples),
+  voiceMicError: (message: string) => ipcRenderer.send('nova:voice-mic-error', message),
   onOverlayShown: (cb: () => void) => {
     ipcRenderer.on('nova:overlay-shown', cb)
     return () => ipcRenderer.removeListener('nova:overlay-shown', cb)
@@ -26,6 +29,10 @@ const nova = {
   onConfigChanged: (cb: (config: unknown) => void) => {
     ipcRenderer.on('nova:config-changed', (_event, config) => cb(config))
     return () => ipcRenderer.removeListener('nova:config-changed', cb)
+  },
+  onVoiceState: (cb: (state: unknown) => void) => {
+    ipcRenderer.on('nova:voice-state', (_event, state) => cb(state))
+    return () => ipcRenderer.removeListener('nova:voice-state', cb)
   },
 }
 

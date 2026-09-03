@@ -10,11 +10,15 @@ files:
   - out/**/*
   - resources/**/*
 
+asarUnpack:
+  - node_modules/sherpa-onnx/**/*
+  - resources/models/**/*
+
 win:
   target:
     - target: nsis
       arch: [x64]
-  icon: resources/tray.png
+  icon: resources/icons/nova.ico
   requestedExecutionLevel: asInvoker
 
 nsis:
@@ -24,6 +28,8 @@ nsis:
   shortcutName: NOVA
   createDesktopShortcut: true
   createStartMenuShortcut: true
+  installerIcon: resources/icons/nova.ico
+  uninstallerIcon: resources/icons/nova.ico
 
 mac:
   target:

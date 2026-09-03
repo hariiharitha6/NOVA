@@ -1,5 +1,7 @@
 // NOVA core types. Platform-neutral. No Electron imports allowed here.
 
+import { DEFAULT_HOTKEY, DEFAULT_PTT_HOTKEY } from './shortcut-policy'
+
 export type Intent =
   | 'OPEN_APPLICATION'
   | 'OPEN_WEBSITE'
@@ -77,6 +79,21 @@ export interface NovaConfig {
    * have been seeded into fileFolders. Guarantees they are added only once.
    */
   defaultsSeeded: boolean
+  /**
+   * v0.2 — Voice. OFF by default. When false NOVA never accesses the
+   * microphone and never registers the PTT shortcut.
+   */
+  voiceEnabled: boolean
+  /** v0.2 — Push-to-talk shortcut (independent of the overlay hotkey). */
+  pttHotkey: string
+  /** v0.2 — Speech language. Slice 1 ships a single English model ("en-US"). */
+  speechLanguage: string
+  /**
+   * v0.2 Slice 3A — set once after the legacy Ctrl+Space defaults have been
+   * migrated to the Ctrl+J family; guards against re-migrating deliberate
+   * user choices.
+   */
+  shortcutsMigratedV2: boolean
 }
 
 export interface LaunchResult {
@@ -103,7 +120,7 @@ export interface ConfigStore {
 export function defaultConfig(): NovaConfig {
   return {
     version: 1,
-    hotkey: 'Control+Space',
+    hotkey: DEFAULT_HOTKEY,
     alwaysOnTop: true,
     startup: false,
     position: null,
@@ -121,5 +138,9 @@ export function defaultConfig(): NovaConfig {
     ],
     fileFolders: [],
     defaultsSeeded: false,
+    voiceEnabled: false,
+    pttHotkey: DEFAULT_PTT_HOTKEY,
+    speechLanguage: 'en-US',
+    shortcutsMigratedV2: false,
   }
 }
