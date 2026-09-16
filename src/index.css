@@ -1,0 +1,265 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ════════════════════════════════════════════════════════════
+   NOVA Royal Identity — design tokens
+   minimal · premium · futuristic · royal · dark
+   ════════════════════════════════════════════════════════════ */
+:root {
+  --nova-bg: #0b0712;
+  --nova-surface: #151021;
+  --nova-primary: #7c3aed;
+  --nova-royal: #a855f7;
+  --nova-highlight: #c084fc;
+  --nova-text: #f5f3ff;
+  --nova-muted: #a8a0b8;
+
+  --nova-surface-glass: rgba(21, 16, 33, 0.86);
+  --nova-border: rgba(168, 85, 247, 0.16);
+  --nova-border-strong: rgba(168, 85, 247, 0.38);
+  --nova-success: #34d399;
+  --nova-danger: #f87171;
+}
+
+/* ─── Global Reset ─────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--nova-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Surfaces ─────────────────────────────────────────────── */
+@layer utilities {
+  .glass {
+    background: var(--nova-surface-glass);
+    backdrop-filter: blur(28px) saturate(150%);
+    -webkit-backdrop-filter: blur(28px) saturate(150%);
+    border: 1px solid var(--nova-border);
+    box-shadow:
+      0 24px 64px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .glass-light {
+    background: rgba(245, 243, 255, 0.03);
+    border: 1px solid rgba(245, 243, 255, 0.06);
+  }
+
+  .glass-hover {
+    transition:
+      background 0.18s ease,
+      border-color 0.18s ease,
+      color 0.18s ease;
+  }
+
+  .glass-hover:hover {
+    background: rgba(124, 58, 237, 0.14);
+    border-color: var(--nova-border-strong);
+  }
+
+  .royal-ring {
+    box-shadow:
+      0 0 0 1px var(--nova-border-strong),
+      0 0 24px rgba(124, 58, 237, 0.18);
+  }
+
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.35);
+  border-radius: 2px;
+}
+
+/* ─── Motion (single home for every NOVA animation) ────────── */
+@keyframes nova-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes nova-listen {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(192, 132, 252, 0.85);
+  }
+}
+
+@keyframes nova-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes nova-flash {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes nova-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nova-anim-breathe {
+  animation: nova-breathe 3.2s ease-in-out infinite;
+}
+
+.nova-anim-listen {
+  animation: nova-listen 1.4s ease-in-out infinite;
+}
+
+.nova-anim-orbit {
+  animation: nova-orbit 1.6s linear infinite;
+}
+
+.nova-anim-flash {
+  animation: nova-flash 0.9s ease-out forwards;
+}
+
+.nova-anim-rise {
+  animation: nova-rise 0.16s ease-out both;
+}
+
+/* Reduced motion: keep state colours, drop all movement. */
+@media (prefers-reduced-motion: reduce) {
+  .nova-anim-breathe,
+  .nova-anim-listen,
+  .nova-anim-orbit,
+  .nova-anim-flash,
+  .nova-anim-rise {
+    animation: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── Input ───────────────────────────────────────────────── */
+.command-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--nova-text);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  width: 100%;
+  caret-color: var(--nova-highlight);
+}
+
+.command-input::placeholder {
+  color: rgba(168, 160, 184, 0.55);
+}
+
+/* ─── Quick Action Chips ──────────────────────────────────── */
+.quick-action-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 12px 8px;
+  border-radius: 12px;
+  background: rgba(245, 243, 255, 0.04);
+  border: 1px solid rgba(245, 243, 255, 0.07);
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+  color: var(--nova-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  min-width: 64px;
+}
+
+.quick-action-btn:hover,
+.quick-action-btn:focus-visible {
+  background: rgba(124, 58, 237, 0.16);
+  border-color: var(--nova-border-strong);
+  color: var(--nova-highlight);
+  outline: none;
+}
+
+.quick-action-btn:active {
+  background: rgba(124, 58, 237, 0.26);
+}
+
+/* ─── Toggle ──────────────────────────────────────────────── */
+.toggle-track {
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  transition: background 0.18s ease;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f5f3ff;
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+}

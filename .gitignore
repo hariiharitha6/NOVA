@@ -1,0 +1,15 @@
+node_modules/
+dist/
+out/
+*.log
+.DS_Store
+Thumbs.db
+
+# Large speech model binaries are kept locally and excluded from git (the STT
+# encoder exceeds GitHub's 100 MB per-file limit). Download/extract them into
+# resources/models/ before packaging with `npm run package:win`.
+#
+# Only the small "Hey NOVA" KWS model is tracked.
+resources/models/*
+!resources/models/sherpa-onnx-kws-hey-nova/
+!resources/models/sherpa-onnx-kws-hey-nova/**
