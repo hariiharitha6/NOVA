@@ -258,6 +258,49 @@ enrolled.* "Hey NOVA" is enrolled and bundled. Arbitrary user phrases (e.g. "Hey
 AJ") are NOT silently detected: they pass through the enrollment seam and surface as
 "unsupported/unenrolled" until a matching BPE token sequence + model directory exist.
 
+## v0.3 Slice 2 — Search / Web Intent Execution (V03-S2)
+
+V03-S2 completes deterministic execution for the search intents introduced in
+V03-S1. `SEARCH_WEB` and `SEARCH_YOUTUBE` resolve to **fixed, trusted search
+origins** with only the user query as encoded data, and execute through the
+**same shared `executeCommand()` → `resolveCommand()` → `Launcher` pipeline** used
+by typed and voice commands. No new parser and no separate voice path were added.
+
+- **RECOGNITION = IMPLEMENTED.** Deterministic phrase patterns:
+  `search for <q>`, `search the web for <q>`, `search google for <q>`,
+  `search web for <q>`, `search youtube for <q>`, `search yt for <q>`,
+  `google search <q>`, `youtube search <q>`, `yt search <q>`,
+  bare `google <q>`, bare `youtube <q>` / `yt <q>`.
+- **URL SAFETY = IMPLEMENTED.** Web → `https://www.google.com/search?q=<encoded>`;
+  YouTube → `https://www.youtube.com/results?search_query=<encoded>`. Query is
+  encoded with `encodeURIComponent`; the origin is fixed and cannot be changed by
+  input. No arbitrary protocol/URL execution from natural language.
+- **PIPELINE = SHARED.** Search intents are handled by the existing
+  `windows-launcher.ts` `openUrl()` path (http(s) only) alongside `OPEN_WEBSITE`.
+- **EMPTY QUERY = CLARIFICATION.** Blank queries never launch a search.
+- **V03-S3+ (focus/workflows), V03-S4 (risk/confirmation enforcement), V03-S5
+  (AI interpretation) are NOT started and remain Planned.**
+
+| Requirement ID | Version | Epic | Requirement | Acceptance Criteria | Priority | Dependencies | Platform | Status |
+|---|---|---|---|---|---|---|---|---|
+| V03-S2-001 | v0.3 | Command Engine | Deterministic SEARCH_WEB recognition | Inputs `search for <q>`, `search the web for <q>`, `search google for <q>`, `search web for <q>`, `google search <q>`, bare `google <q>` resolve to `SEARCH_WEB` with `arguments.query`. No LLM. | High | V03-S1 | Cross-platform | Completed |
+| V03-S2-002 | v0.3 | Command Engine | Deterministic SEARCH_YOUTUBE recognition | Inputs `search youtube for <q>`, `search yt for <q>`, `youtube search <q>`, `yt search <q>`, bare `youtube <q>`/`yt <q>` resolve to `SEARCH_YOUTUBE` with `arguments.query`. | High | V03-S1 | Cross-platform | Completed |
+| V03-S2-003 | v0.3 | Security | Safe fixed-origin URL construction | Web target is exactly `https://www.google.com/search?q=<encodeURIComponent(q)>`; YouTube target is exactly `https://www.youtube.com/results?search_query=<encodeURIComponent(q)>`. The origin is constant; only the query is dynamic and is encoded. | High | V03-S2-001 | Cross-platform | Completed |
+| V03-S2-004 | v0.3 | Security | Query is data, never executable | Queries containing `https://evil.example`, `&`, `?redirect=`, shell-like strings, punctuation, and symbols remain query data; the trusted origin is unchanged and no shell/protocol/eval path is introduced. | High | V03-S2-003 | Cross-platform | Completed |
+| V03-S2-005 | v0.3 | Execution | Search executes through the shared pipeline | `SEARCH_WEB`/`SEARCH_YOUTUBE` are launched by the existing Windows launcher `openUrl()` (http(s)-only) exactly like `OPEN_WEBSITE`; typed and voice input both call the same `executeCommand()` → `resolveCommand()` path. | High | V03-S2-003 | Windows | Completed |
+| V03-S2-006 | v0.3 | Command Engine | Empty/invalid query handling | Blank queries (`search for`, `search youtube for`, `search google for`) return a `CLARIFICATION` and never launch a blank search. | High | V03-S2-001 | Cross-platform | Completed |
+| V03-S2-007 | v0.3 | Quality | V03-S2 automated tests | `tests/v03-search.test.ts` covers recognition, query extraction/encoding, empty queries, security (trusted origin preserved, shell-like input stays data), and shared-pipeline execution through `executeCommand()`. No GUI/microphone required. | High | V03-S2-001 | Cross-platform | Completed |
+| V03-S2-008 | v0.3 | Quality | Clean TypeScript/build + regression | `npx tsc --noEmit` exits 0, `npm run build` succeeds, and all pre-existing v0.1/v0.2 tests continue to pass (209/209 total after V03-S2, including the new search suite). | High | All V03-S2 | Cross-platform | Completed |
+
+**Known limitations (honest):** Search requires a default browser; results appear
+in the system browser (NOVA does not render results in-app). Search intents are
+deterministic phrase patterns only — free-form natural-language search phrasing
+beyond the patterns above is not recognized and falls back to clarification. The
+`CommandResult` structured response type exists but the search path continues to
+surface via the existing `launched` response (action + LaunchResult) to avoid
+changing v0.2 behavior. Risk/confirmation enforcement (V03-S4) is not yet applied
+beyond the LOW classification recorded on the action.
+
 ---
 
 ## Legend
@@ -295,3 +338,10 @@ AJ") are NOT silently detected: they pass through the enrollment seam and surfac
   model exist. "Hey NOVA" is enrolled and bundled; arbitrary custom phrases (e.g.
   "Hey AJ") surface as unsupported/unenrolled — they are configurable but not
   detectable until enrolled.
+- **V03-S1-*** — v0.3 Slice 1 (command model + deterministic intent engine
+  foundation). Implemented; automated checks clean. Status **Completed** at the
+  code/test level.
+- **V03-S2-*** — v0.3 Slice 2 (search / web intent execution). Implemented;
+  automated checks clean. Status **Completed** at the code/test level. Manual
+  browser/voice verification of a live search is **Testing — awaiting human
+  verification**.

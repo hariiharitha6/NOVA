@@ -862,6 +862,20 @@ Build:
 -   natural-language workflow triggers
 -   confirmation for risky actions
 
+### Progress (incremental slices)
+
+-   **V03-S1 — Completed.** Command model foundation + deterministic intent
+    engine: structured `StructuredAction` with `intent`/`target`/`label`/
+    `arguments`/`risk`, expanded `Intent` union, `CommandResult` type, and
+    deterministic recognition for `SEARCH_WEB`, `SEARCH_YOUTUBE`,
+    `OPEN_SETTINGS`, `FOCUS_APPLICATION`, `SHOW_FAVORITES`, `SHOW_RECENTS`,
+    `UNKNOWN`.
+-   **V03-S2 — Completed.** Search intent execution: fixed trusted Google/YouTube
+    origins, `encodeURIComponent`-encoded queries, http(s)-only execution through
+    the shared launcher, empty-query clarification, and tests. See `RTM.md`.
+-   **V03-S3..S5 — Planned.** App focus execution/workflows, risk/confirmation
+    enforcement, and optional local-AI interpretation are not started.
+
 ### Exit Gate
 
 Simple commands work without AI and complex commands can use optional

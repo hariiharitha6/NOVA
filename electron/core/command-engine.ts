@@ -66,18 +66,16 @@ export function resolveCommand(
   // Search commands
   const searchMatch = raw.match(/^search\s+(?:youtube|yt)\s+for\s+(.+)$/i) ?? raw.match(/^search\s+(?:google|web)\s+for\s+(.+)$/i) ??
     raw.match(/^youtube\s+search\s+(.+)$/i) ?? raw.match(/^yt\s+search\s+(.+)$/i) ??
-    raw.match(/^google\s+search\s+(.+)$/i)
+    raw.match(/^google\s+search\s+(.+)$/i) ??
+    raw.match(/^search\s+for\s+(.+)$/i) ??
+    raw.match(/^search\s+the\s+web\s+for\s+(.+)$/i)
   
   if (searchMatch) {
     const query = searchMatch[1].trim()
-    const isYouTube = raw.match(/youtube|yt/i)
-    if (isYouTube && raw.match(/^search\s+(google|web)/i) === null && raw.includes('youtube') || raw.match(/^youtube|^yt/i)) {
-      if (raw.match(/^search\s+(?:google|web)/i)) {
-        // search google for ... on youtube? no - explicit google
-      }
+    if (!query) {
+      return clarification('Please provide a search query.')
     }
-    // Better detection
-    if (raw.match(/youtube|yt/i) && !raw.match(/google|web/i)) {
+    if (/\b(?:youtube|yt)\b/i.test(raw) && !/^(search\s+(?:google|web))/i.test(raw)) {
       return {
         intent: 'SEARCH_YOUTUBE',
         target: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
@@ -97,7 +95,12 @@ export function resolveCommand(
 
   // Direct search patterns
   if (raw.match(/^search\s+youtube\s+(.+)$/i)) {
-    const q = raw.replace(/^search\s+youtube\s+/i, '').trim()
+    const q = raw
+      .replace(/^search\s+youtube\s+/i, '')
+      .replace(/^for\s+/i, '')
+      .replace(/^for$/i, '')
+      .trim()
+    if (!q) return clarification('Please provide a search query.')
     return {
       intent: 'SEARCH_YOUTUBE',
       target: `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
@@ -107,13 +110,44 @@ export function resolveCommand(
     }
   }
   if (raw.match(/^search\s+google\s+(.+)$/i) || raw.match(/^search\s+web\s+(.+)$/i)) {
-    const q = raw.replace(/^search\s+(google|web)\s+/i, '').trim()
+    const q = raw
+      .replace(/^search\s+(google|web)\s+/i, '')
+      .replace(/^for\s+/i, '')
+      .replace(/^for$/i, '')
+      .trim()
+    if (!q) return clarification('Please provide a search query.')
     return {
       intent: 'SEARCH_WEB',
       target: `https://www.google.com/search?q=${encodeURIComponent(q)}`,
       label: `Search Google for "${q}"`,
       arguments: { query: q },
       risk: 'LOW',
+    }
+  }
+
+  // Bare "google ..." or "youtube ..." search patterns
+  if (raw.match(/^youtube\s+(.+)$/i) || raw.match(/^yt\s+(.+)$/i)) {
+    const q = raw.replace(/^(youtube|yt)\s+/i, '').trim()
+    if (q && q.match(/^(search|for|results)/i) === null) {
+      return {
+        intent: 'SEARCH_YOUTUBE',
+        target: `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
+        label: `Search YouTube for "${q}"`,
+        arguments: { query: q },
+        risk: 'LOW',
+      }
+    }
+  }
+  if (raw.match(/^google\s+(.+)$/i)) {
+    const q = raw.replace(/^google\s+/i, '').trim()
+    if (q && q.match(/^(search|for)/i) === null) {
+      return {
+        intent: 'SEARCH_WEB',
+        target: `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+        label: `Search Google for "${q}"`,
+        arguments: { query: q },
+        risk: 'LOW',
+      }
     }
   }
 

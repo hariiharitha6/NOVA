@@ -69,6 +69,8 @@ export function createWindowsLauncher(): Launcher {
         case 'OPEN_FILE':
         case 'OPEN_FOLDER':
           return openPath(action.target, action.label)
+        case 'SEARCH_WEB':
+        case 'SEARCH_YOUTUBE':
         case 'OPEN_WEBSITE':
           return openUrl(action.target, action.label)
         case 'CLARIFICATION':

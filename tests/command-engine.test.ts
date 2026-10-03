@@ -29,7 +29,7 @@ const registry: CommandSource = {
   ],
 }
 
-const SAFE_INTENTS = new Set(['OPEN_APPLICATION', 'OPEN_WEBSITE', 'OPEN_FILE', 'OPEN_FOLDER', 'CLARIFICATION'])
+const SAFE_INTENTS = new Set(['OPEN_APPLICATION', 'OPEN_WEBSITE', 'OPEN_FILE', 'OPEN_FOLDER', 'SEARCH_WEB', 'SEARCH_YOUTUBE', 'OPEN_SETTINGS', 'FOCUS_APPLICATION', 'SHOW_FAVORITES', 'SHOW_RECENTS', 'CLARIFICATION', 'UNKNOWN'])
 
 describe('resolveCommand', () => {
   it('resolves an exact app name', () => {
