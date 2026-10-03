@@ -154,7 +154,7 @@ export function createVoiceController(deps: VoiceControllerDeps): VoiceControlle
           message: response.result.message || `Could not launch ${response.result.label}`,
         })
       }
-    } else {
+    } else if (response.kind === 'clarification') {
       const suggestion = response.action.suggestions?.length
         ? ` Did you mean: ${response.action.suggestions.join(', ')}?`
         : ''
@@ -163,6 +163,20 @@ export function createVoiceController(deps: VoiceControllerDeps): VoiceControlle
         partial: '',
         transcript,
         message: `${response.action.label}${suggestion}`,
+      })
+    } else if (response.kind === 'result') {
+      setState({
+        phase: response.result.success ? 'success' : 'error',
+        partial: '',
+        transcript,
+        message: response.result.message,
+      })
+    } else {
+      setState({
+        phase: 'error',
+        partial: '',
+        transcript,
+        message: 'Unknown response',
       })
     }
     resultTimer = setTimeout(toIdle, RESULT_DISPLAY_MS)

@@ -59,6 +59,92 @@ export function resolveCommand(
       intent: 'OPEN_WEBSITE',
       target: raw,
       label: raw,
+      risk: 'LOW',
+    }
+  }
+
+  // Search commands
+  const searchMatch = raw.match(/^search\s+(?:youtube|yt)\s+for\s+(.+)$/i) ?? raw.match(/^search\s+(?:google|web)\s+for\s+(.+)$/i) ??
+    raw.match(/^youtube\s+search\s+(.+)$/i) ?? raw.match(/^yt\s+search\s+(.+)$/i) ??
+    raw.match(/^google\s+search\s+(.+)$/i)
+  
+  if (searchMatch) {
+    const query = searchMatch[1].trim()
+    const isYouTube = raw.match(/youtube|yt/i)
+    if (isYouTube && raw.match(/^search\s+(google|web)/i) === null && raw.includes('youtube') || raw.match(/^youtube|^yt/i)) {
+      if (raw.match(/^search\s+(?:google|web)/i)) {
+        // search google for ... on youtube? no - explicit google
+      }
+    }
+    // Better detection
+    if (raw.match(/youtube|yt/i) && !raw.match(/google|web/i)) {
+      return {
+        intent: 'SEARCH_YOUTUBE',
+        target: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
+        label: `Search YouTube for "${query}"`,
+        arguments: { query },
+        risk: 'LOW',
+      }
+    }
+    return {
+      intent: 'SEARCH_WEB',
+      target: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
+      label: `Search Google for "${query}"`,
+      arguments: { query },
+      risk: 'LOW',
+    }
+  }
+
+  // Direct search patterns
+  if (raw.match(/^search\s+youtube\s+(.+)$/i)) {
+    const q = raw.replace(/^search\s+youtube\s+/i, '').trim()
+    return {
+      intent: 'SEARCH_YOUTUBE',
+      target: `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
+      label: `Search YouTube for "${q}"`,
+      arguments: { query: q },
+      risk: 'LOW',
+    }
+  }
+  if (raw.match(/^search\s+google\s+(.+)$/i) || raw.match(/^search\s+web\s+(.+)$/i)) {
+    const q = raw.replace(/^search\s+(google|web)\s+/i, '').trim()
+    return {
+      intent: 'SEARCH_WEB',
+      target: `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+      label: `Search Google for "${q}"`,
+      arguments: { query: q },
+      risk: 'LOW',
+    }
+  }
+
+  // Go to patterns
+  if (raw.match(/^go\s+to\s+youtube/i)) {
+    return { intent: 'OPEN_WEBSITE', target: 'https://www.youtube.com', label: 'YouTube', risk: 'LOW' }
+  }
+  if (raw.match(/^go\s+to\s+google/i)) {
+    return { intent: 'OPEN_WEBSITE', target: 'https://www.google.com', label: 'Google', risk: 'LOW' }
+  }
+
+  // Show/focus patterns
+  if (raw.match(/^show\s+favorites/i) || raw.match(/^favorites/i)) {
+    return { intent: 'SHOW_FAVORITES', target: '', label: 'Show Favorites', risk: 'LOW' }
+  }
+  if (raw.match(/^show\s+recents/i) || raw.match(/^recents/i) || raw.match(/^recent/i)) {
+    return { intent: 'SHOW_RECENTS', target: '', label: 'Show Recents', risk: 'LOW' }
+  }
+  if (raw.match(/^open\s+settings/i) || raw.match(/^settings/i) || raw.match(/^preferences/i)) {
+    return { intent: 'OPEN_SETTINGS', target: '', label: 'Open Settings', risk: 'LOW' }
+  }
+  if (raw.match(/^focus\s+(.+)$/i) || raw.match(/^bring\s+(.+)\s+to\s+front$/i) || raw.match(/^switch\s+to\s+(.+)$/i)) {
+    const focusMatch = raw.match(/^focus\s+(.+)$/i) ?? raw.match(/^bring\s+(.+)\s+to\s+front$/i) ?? raw.match(/^switch\s+to\s+(.+)$/i)
+    const focusTerm = focusMatch ? focusMatch[1].trim() : ''
+    const app = registry.apps.find((a) => aliasMatch(focusTerm, [a.name], a.aliases))
+    if (app) {
+      return { intent: 'FOCUS_APPLICATION', target: app.path, label: app.name, risk: 'LOW' }
+    }
+    const appLike = bestStartWith(registry.apps, focusTerm)
+    if (appLike) {
+      return { intent: 'FOCUS_APPLICATION', target: appLike.path, label: appLike.name, risk: 'LOW' }
     }
   }
 
@@ -77,6 +163,7 @@ export function resolveCommand(
         label: `Could not find "${remainder}"`,
         description: 'Did you mean one of these?',
         suggestions: similar,
+        risk: 'LOW',
       }
     }
     return {
@@ -84,6 +171,7 @@ export function resolveCommand(
       target: '',
       label: `Could not find "${remainder}"`,
       description: 'Check the name, or add it to NOVA in Settings.',
+      risk: 'LOW',
     }
   }
 
@@ -92,21 +180,23 @@ export function resolveCommand(
 
   const similar = similarNames(raw, registry)
   if (similar.length > 0) {
+      return {
+        intent: 'CLARIFICATION',
+        target: '',
+        label: `Unknown command "${raw}"`,
+        description: 'Did you mean one of these?',
+        suggestions: similar,
+        risk: 'LOW',
+      }
+    }
+
     return {
       intent: 'CLARIFICATION',
       target: '',
       label: `Unknown command "${raw}"`,
-      description: 'Did you mean one of these?',
-      suggestions: similar,
+      description: 'Try "Open <App>", "Open <website>", or "Open <folder>".',
+      risk: 'LOW',
     }
-  }
-
-  return {
-    intent: 'CLARIFICATION',
-    target: '',
-    label: `Unknown command "${raw}"`,
-    description: 'Try "Open <App>", "Open <website>", or "Open <folder>".',
-  }
 }
 
 function resolveTarget(name: string, registry: CommandSource): StructuredAction | null {
@@ -119,24 +209,25 @@ function resolveTarget(name: string, registry: CommandSource): StructuredAction 
       intent: fileEntry.kind === 'folder' ? 'OPEN_FOLDER' : 'OPEN_FILE',
       target: fileEntry.path,
       label: fileEntry.name,
+      risk: 'LOW',
     }
   }
 
   const app = registry.apps.find((a) => aliasMatch(q, [a.name], a.aliases))
   if (app) {
-    return { intent: 'OPEN_APPLICATION', target: app.path, label: app.name }
+    return { intent: 'OPEN_APPLICATION', target: app.path, label: app.name, risk: 'LOW' }
   }
 
   const website = registry.websites.find((w) => aliasMatch(q, [w.name], w.aliases))
   if (website) {
-    return { intent: 'OPEN_WEBSITE', target: website.url, label: website.name }
+    return { intent: 'OPEN_WEBSITE', target: website.url, label: website.name, risk: 'LOW' }
   }
 
   const appLike = bestStartWith(registry.apps, q)
-  if (appLike) return { intent: 'OPEN_APPLICATION', target: appLike.path, label: appLike.name }
+  if (appLike) return { intent: 'OPEN_APPLICATION', target: appLike.path, label: appLike.name, risk: 'LOW' }
 
   const websiteLike = bestStartWith(registry.websites, q)
-  if (websiteLike) return { intent: 'OPEN_WEBSITE', target: websiteLike.url, label: websiteLike.name }
+  if (websiteLike) return { intent: 'OPEN_WEBSITE', target: websiteLike.url, label: websiteLike.name, risk: 'LOW' }
 
   return null
 }
@@ -161,5 +252,5 @@ function similarNames(name: string, registry: CommandSource): string[] {
 }
 
 function clarification(label: string, description?: string): StructuredAction {
-  return { intent: 'CLARIFICATION', target: '', label, description }
+  return { intent: 'CLARIFICATION', target: '', label, description, risk: 'LOW' }
 }

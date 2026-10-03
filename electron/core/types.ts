@@ -8,7 +8,14 @@ export type Intent =
   | 'OPEN_WEBSITE'
   | 'OPEN_FILE'
   | 'OPEN_FOLDER'
+  | 'SEARCH_WEB'
+  | 'SEARCH_YOUTUBE'
+  | 'OPEN_SETTINGS'
+  | 'FOCUS_APPLICATION'
+  | 'SHOW_FAVORITES'
+  | 'SHOW_RECENTS'
   | 'CLARIFICATION'
+  | 'UNKNOWN'
 
 export interface StructuredAction {
   intent: Intent
@@ -16,6 +23,8 @@ export interface StructuredAction {
   label: string
   description?: string
   suggestions?: string[]
+  arguments?: Record<string, unknown>
+  risk?: 'LOW' | 'MEDIUM' | 'HIGH'
 }
 
 export interface AppEntry {
@@ -117,9 +126,17 @@ export interface LaunchResult {
   label: string
 }
 
+export interface CommandResult {
+  success: boolean
+  intent: Intent
+  message: string
+  action?: StructuredAction
+}
+
 export type CommandResponse =
   | { kind: 'launched'; action: StructuredAction; result: LaunchResult }
   | { kind: 'clarification'; action: StructuredAction }
+  | { kind: 'result'; result: CommandResult }
 
 export interface AppSource {
   readonly id: string

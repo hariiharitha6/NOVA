@@ -114,7 +114,11 @@ export function CommandOverlay() {
     void submit(suggestion)
   }
 
-  const feedbackAction = feedback ? feedback.action : null
+  const feedbackAction = feedback?.kind === 'clarification' || feedback?.kind === 'launched'
+    ? feedback.action
+    : feedback?.kind === 'result'
+      ? { intent: feedback.result.intent, target: '', label: feedback.result.message, risk: 'LOW' as const }
+      : null
   const isLaunched = feedback?.kind === 'launched'
   const isOk = isLaunched && feedback.result.ok
 
@@ -225,7 +229,7 @@ export function CommandOverlay() {
                 ) : null}
                 {feedbackAction.suggestions && feedbackAction.suggestions.length > 0 ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-                    {feedbackAction.suggestions.map((s) => (
+                    {feedbackAction.suggestions.map((s: string) => (
                       <button
                         key={s}
                         className="quick-action-btn"
