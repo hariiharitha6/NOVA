@@ -8,8 +8,10 @@ import { createWindowsLauncher } from './platform/windows-launcher'
 import { seedDefaultFileFolders } from './platform/windows-shortcuts'
 import { createWindowManager } from './windows'
 import { registerHotkey, unregisterAllHotkeys, registerPttHotkey, registerEscapeCancel, unregisterEscapeCancel } from './hotkey'
-import { registerIpcHandlers, broadcastConfig } from './ipc'
+import { registerIpcHandlers, broadcastConfig, broadcastConfirmationState } from './ipc'
 import { executeCommand, createCommandPipelineDeps } from './core/command-pipeline'
+import { createConfirmationGate } from './core/confirmation'
+import type { ConfirmationGate } from './core/confirmation'
 import { migrateShortcutDefaults } from './core/shortcut-policy'
 import { createTray } from './tray'
 import { createSherpaSpeechRecognizer } from './core/speech/sherpa-recognizer'
@@ -32,6 +34,8 @@ if (!gotTheLock) {
   let tray: Electron.Tray | null = null
   let voice: ReturnType<typeof createVoiceController> | null = null
   let wake: ReturnType<typeof createWakeWordController> | null = null
+  /** V03-S4 — the single confirmation gate, kept for shutdown teardown. */
+  let confirmationGate: ConfirmationGate | null = null
 
   app.whenReady().then(() => {
     electronApp.setAppUserModelId('com.nova.desktop')
@@ -57,7 +61,24 @@ if (!gotTheLock) {
     })
     const launcher = createWindowsLauncher()
 
-    windowManager = createWindowManager(configStore)
+    // V03-S4: ONE confirmation gate for the whole process. Typed IPC and voice
+    // both resolve through this instance, so there is a single pending slot and
+    // no voice-only way to reach the executor.
+    confirmationGate = createConfirmationGate({
+      onSettled: () => {
+        // The prompt can be answered from any surface, so every surface is told.
+        voice?.clearConfirmation()
+        if (confirmationGate) broadcastConfirmationState(confirmationGate)
+      },
+    })
+
+    windowManager = createWindowManager(configStore, {
+      // Hiding the overlay removes the prompt from the screen, so it must not
+      // stay armed in the background.
+      onOverlayHidden: () => {
+        confirmationGate?.invalidate('cancelled')
+      },
+    })
 
     const hotkey = configStore.get().hotkey
     const hotkeyOk = registerHotkey(hotkey, windowManager)
@@ -77,15 +98,19 @@ if (!gotTheLock) {
       executeCommand: (input) =>
         // SAME pipeline factory as the typed IPC path, so voice and typed input
         // can never diverge (focus / favorites / recents / settings included).
+        // `source: 'voice'` adds ONLY the fixed confirmation phrases, and only
+        // while a confirmation is actually pending.
         executeCommand(
           input,
           createCommandPipelineDeps({
             configStore,
             registry,
             launcher,
+            confirmation: confirmationGate ?? undefined,
             onRecent: () => broadcastConfig(configStore),
             openSettings: () => windowManager?.showSettings(),
           }),
+          { source: 'voice' },
         ),
       emit: (state) => {
         windowManager?.setVoiceMode(state.phase !== 'idle')
@@ -135,7 +160,15 @@ if (!gotTheLock) {
       registerPttHotkey(configStore.get().pttHotkey, () => voiceInstance.togglePtt())
     }
 
-    registerIpcHandlers({ configStore, registry, launcher, manager: windowManager, voice: voiceInstance, wake })
+    registerIpcHandlers({
+      configStore,
+      registry,
+      launcher,
+      manager: windowManager,
+      voice: voiceInstance,
+      wake,
+      confirmation: confirmationGate,
+    })
     windowManager.init()
     tray = createTray(windowManager)
 
@@ -151,6 +184,12 @@ if (!gotTheLock) {
   app.on('will-quit', () => {
     unregisterAllHotkeys()
     tray?.destroy()
+    try {
+      // Never leave an armed confirmation behind on shutdown.
+      confirmationGate?.dispose()
+    } catch {
+      // ignore
+    }
     try {
       wake?.dispose()
     } catch {

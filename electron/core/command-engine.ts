@@ -1,5 +1,11 @@
 // Deterministic command engine. Platform-neutral.
 // Parses user input and emits ONLY typed StructuredActions. Never raw shell strings.
+//
+// v0.3 (V03-S4): this parser deliberately does NOT assign `StructuredAction.risk`.
+// Recognition and risk are separate concerns, and a future natural-language or AI
+// interpreter must not be able to declare its own proposal safe. The risk level is
+// stamped deterministically by electron/core/risk-policy.ts, which the command
+// pipeline applies immediately before the confirmation gate.
 
 import type {
   AppEntry,
@@ -59,7 +65,6 @@ export function resolveCommand(
       intent: 'OPEN_WEBSITE',
       target: raw,
       label: raw,
-      risk: 'LOW',
     }
   }
 
@@ -81,7 +86,6 @@ export function resolveCommand(
         target: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
         label: `Search YouTube for "${query}"`,
         arguments: { query },
-        risk: 'LOW',
       }
     }
     return {
@@ -89,7 +93,6 @@ export function resolveCommand(
       target: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
       label: `Search Google for "${query}"`,
       arguments: { query },
-      risk: 'LOW',
     }
   }
 
@@ -106,7 +109,6 @@ export function resolveCommand(
       target: `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
       label: `Search YouTube for "${q}"`,
       arguments: { query: q },
-      risk: 'LOW',
     }
   }
   if (raw.match(/^search\s+google\s+(.+)$/i) || raw.match(/^search\s+web\s+(.+)$/i)) {
@@ -121,7 +123,6 @@ export function resolveCommand(
       target: `https://www.google.com/search?q=${encodeURIComponent(q)}`,
       label: `Search Google for "${q}"`,
       arguments: { query: q },
-      risk: 'LOW',
     }
   }
 
@@ -134,7 +135,6 @@ export function resolveCommand(
         target: `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
         label: `Search YouTube for "${q}"`,
         arguments: { query: q },
-        risk: 'LOW',
       }
     }
   }
@@ -146,28 +146,27 @@ export function resolveCommand(
         target: `https://www.google.com/search?q=${encodeURIComponent(q)}`,
         label: `Search Google for "${q}"`,
         arguments: { query: q },
-        risk: 'LOW',
       }
     }
   }
 
   // Go to patterns
   if (raw.match(/^go\s+to\s+youtube/i)) {
-    return { intent: 'OPEN_WEBSITE', target: 'https://www.youtube.com', label: 'YouTube', risk: 'LOW' }
+    return { intent: 'OPEN_WEBSITE', target: 'https://www.youtube.com', label: 'YouTube' }
   }
   if (raw.match(/^go\s+to\s+google/i)) {
-    return { intent: 'OPEN_WEBSITE', target: 'https://www.google.com', label: 'Google', risk: 'LOW' }
+    return { intent: 'OPEN_WEBSITE', target: 'https://www.google.com', label: 'Google' }
   }
 
   // Show/focus patterns
   if (raw.match(/^show\s+favorites/i) || raw.match(/^favorites/i)) {
-    return { intent: 'SHOW_FAVORITES', target: '', label: 'Show Favorites', risk: 'LOW' }
+    return { intent: 'SHOW_FAVORITES', target: '', label: 'Show Favorites' }
   }
   if (raw.match(/^show\s+recents/i) || raw.match(/^recents/i) || raw.match(/^recent/i)) {
-    return { intent: 'SHOW_RECENTS', target: '', label: 'Show Recents', risk: 'LOW' }
+    return { intent: 'SHOW_RECENTS', target: '', label: 'Show Recents' }
   }
   if (raw.match(/^open\s+settings/i) || raw.match(/^settings/i) || raw.match(/^preferences/i)) {
-    return { intent: 'OPEN_SETTINGS', target: '', label: 'Open Settings', risk: 'LOW' }
+    return { intent: 'OPEN_SETTINGS', target: '', label: 'Open Settings' }
   }
   if (raw.match(/^focus\s+(.+)$/i) || raw.match(/^bring\s+(.+)\s+to\s+front$/i) || raw.match(/^switch\s+to\s+(.+)$/i)) {
     const focusMatch = raw.match(/^focus\s+(.+)$/i) ?? raw.match(/^bring\s+(.+)\s+to\s+front$/i) ?? raw.match(/^switch\s+to\s+(.+)$/i)
@@ -176,11 +175,11 @@ export function resolveCommand(
     // command can never carry raw user text into the platform layer.
     const app = registry.apps.find((a) => aliasMatch(focusTerm, [a.name], a.aliases))
     if (app) {
-      return { intent: 'FOCUS_APPLICATION', target: app.path, label: app.name, risk: 'LOW' }
+      return { intent: 'FOCUS_APPLICATION', target: app.path, label: app.name }
     }
     const appLike = bestStartWith(registry.apps, focusTerm)
     if (appLike) {
-      return { intent: 'FOCUS_APPLICATION', target: appLike.path, label: appLike.name, risk: 'LOW' }
+      return { intent: 'FOCUS_APPLICATION', target: appLike.path, label: appLike.name }
     }
     // Unknown focus target: clarify instead of falling through to OPEN_*.
     // FOCUS_APPLICATION must never be downgraded into a launch.
@@ -205,7 +204,6 @@ export function resolveCommand(
         label: `Could not find "${remainder}"`,
         description: 'Did you mean one of these?',
         suggestions: similar,
-        risk: 'LOW',
       }
     }
     return {
@@ -213,7 +211,6 @@ export function resolveCommand(
       target: '',
       label: `Could not find "${remainder}"`,
       description: 'Check the name, or add it to NOVA in Settings.',
-      risk: 'LOW',
     }
   }
 
@@ -228,7 +225,6 @@ export function resolveCommand(
         label: `Unknown command "${raw}"`,
         description: 'Did you mean one of these?',
         suggestions: similar,
-        risk: 'LOW',
       }
     }
 
@@ -237,7 +233,6 @@ export function resolveCommand(
       target: '',
       label: `Unknown command "${raw}"`,
       description: 'Try "Open <App>", "Open <website>", or "Open <folder>".',
-      risk: 'LOW',
     }
 }
 
@@ -251,25 +246,24 @@ function resolveTarget(name: string, registry: CommandSource): StructuredAction 
       intent: fileEntry.kind === 'folder' ? 'OPEN_FOLDER' : 'OPEN_FILE',
       target: fileEntry.path,
       label: fileEntry.name,
-      risk: 'LOW',
     }
   }
 
   const app = registry.apps.find((a) => aliasMatch(q, [a.name], a.aliases))
   if (app) {
-    return { intent: 'OPEN_APPLICATION', target: app.path, label: app.name, risk: 'LOW' }
+    return { intent: 'OPEN_APPLICATION', target: app.path, label: app.name }
   }
 
   const website = registry.websites.find((w) => aliasMatch(q, [w.name], w.aliases))
   if (website) {
-    return { intent: 'OPEN_WEBSITE', target: website.url, label: website.name, risk: 'LOW' }
+    return { intent: 'OPEN_WEBSITE', target: website.url, label: website.name }
   }
 
   const appLike = bestStartWith(registry.apps, q)
-  if (appLike) return { intent: 'OPEN_APPLICATION', target: appLike.path, label: appLike.name, risk: 'LOW' }
+  if (appLike) return { intent: 'OPEN_APPLICATION', target: appLike.path, label: appLike.name }
 
   const websiteLike = bestStartWith(registry.websites, q)
-  if (websiteLike) return { intent: 'OPEN_WEBSITE', target: websiteLike.url, label: websiteLike.name, risk: 'LOW' }
+  if (websiteLike) return { intent: 'OPEN_WEBSITE', target: websiteLike.url, label: websiteLike.name }
 
   return null
 }
@@ -294,5 +288,5 @@ function similarNames(name: string, registry: CommandSource): string[] {
 }
 
 function clarification(label: string, description?: string): StructuredAction {
-  return { intent: 'CLARIFICATION', target: '', label, description, risk: 'LOW' }
+  return { intent: 'CLARIFICATION', target: '', label, description }
 }

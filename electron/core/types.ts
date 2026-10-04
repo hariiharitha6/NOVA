@@ -17,6 +17,13 @@ export type Intent =
   | 'CLARIFICATION'
   | 'UNKNOWN'
 
+/**
+ * v0.3 (V03-S4) — the single risk scale used by the whole command
+ * architecture. Classification is deterministic and lives in
+ * `electron/core/risk-policy.ts`; nothing else may invent a level.
+ */
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH'
+
 export interface StructuredAction {
   intent: Intent
   target: string
@@ -24,7 +31,12 @@ export interface StructuredAction {
   description?: string
   suggestions?: string[]
   arguments?: Record<string, unknown>
-  risk?: 'LOW' | 'MEDIUM' | 'HIGH'
+  /**
+   * Assigned by the risk policy immediately before the confirmation gate. It is
+   * optional on the type because recognition happens before classification; a
+   * missing level is treated as the most conservative one at the gate.
+   */
+  risk?: RiskLevel
 }
 
 export interface AppEntry {
@@ -146,10 +158,53 @@ export interface CommandResult {
   data?: CommandResultData
 }
 
+/**
+ * v0.3 (V03-S4) — a confirmation prompt for exactly ONE already-validated
+ * structured command that has NOT been executed yet.
+ *
+ * The renderer receives this and can send back nothing except `token`. The
+ * executable payload (intent target, path, URL) is deliberately NOT part of the
+ * request as an actionable field: it is display-only context, and the token is
+ * the one and only way to approve or reject the command. A confirmation is
+ * therefore "the user approved this specific, already-validated action" — never
+ * "the user approved arbitrary data".
+ */
+export interface ConfirmationRequest {
+  /** Opaque, single-use identifier. The only value the renderer may return. */
+  token: string
+  /** Authoritative risk level that triggered the gate. */
+  risk: RiskLevel
+  /** Intent of the pending command (for UI labelling only). */
+  intent: Intent
+  /** Human-readable "what NOVA will do", e.g. `Open Visual Studio Code?` */
+  prompt: string
+  /** Optional display-only extra context, e.g. the URL or path involved. */
+  detail?: string
+  /** Lifetime of the prompt in milliseconds (it never outlives this window). */
+  expiresInMs: number
+}
+
+/** Why a confirmation-required command did not run. */
+export type ConfirmationCancelReason =
+  /** The user explicitly rejected it (button, Escape, or a spoken "no"). */
+  | 'user'
+  /** The prompt expired before the user answered. */
+  | 'timeout'
+  /** The token no longer refers to the pending command. */
+  | 'stale'
+  /** A newer command replaced this prompt. */
+  | 'superseded'
+  /** No confirmation gate is available, so nothing could be approved. */
+  | 'unavailable'
+
 export type CommandResponse =
   | { kind: 'launched'; action: StructuredAction; result: LaunchResult }
   | { kind: 'clarification'; action: StructuredAction }
   | { kind: 'result'; result: CommandResult }
+  /** V03-S4: held at the gate. The command has NOT run yet. */
+  | { kind: 'confirmation'; request: ConfirmationRequest }
+  /** V03-S4: a confirmation-required command was not run. */
+  | { kind: 'cancelled'; reason: ConfirmationCancelReason; action?: StructuredAction; message: string }
 
 export interface AppSource {
   readonly id: string

@@ -1,6 +1,12 @@
 /// <reference types="vite/client" />
 
-import type { CommandResponse, DisplayInfo, NovaConfig, RegistrySnapshot } from '../electron/core/types'
+import type {
+  CommandResponse,
+  ConfirmationRequest,
+  DisplayInfo,
+  NovaConfig,
+  RegistrySnapshot,
+} from '../electron/core/types'
 import type { VoiceState } from '../electron/core/speech/types'
 
 interface ImportMetaEnv {
@@ -28,6 +34,9 @@ declare global {
       getConfig(): Promise<NovaConfig>
       updateConfig(patch: Partial<NovaConfig>): Promise<NovaConfig>
       runCommand(input: string): Promise<CommandResponse>
+      getConfirmationState(): Promise<ConfirmationRequest | null>
+      confirmCommand(token: string): Promise<CommandResponse>
+      cancelCommand(token: string): Promise<CommandResponse>
       getRegistry(): Promise<RegistrySnapshot>
       getStartup(): Promise<boolean>
       setStartup(enable: boolean): void
@@ -50,6 +59,7 @@ declare global {
       onOverlayShown(cb: () => void): () => void
       onConfigChanged(cb: (config: NovaConfig) => void): () => void
       onVoiceState(cb: (state: VoiceState) => void): () => void
+      onConfirmationState(cb: (request: ConfirmationRequest | null) => void): () => void
       onWakeStatus(cb: (status: WakeStatus) => void): () => void
     }
   }

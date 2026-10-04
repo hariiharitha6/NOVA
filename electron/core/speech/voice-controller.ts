@@ -33,6 +33,12 @@ export interface VoiceController {
   beginListening(): void
   /** Escape: cancel the active listening session. */
   cancelListening(): void
+  /**
+   * V03-S4: the pending confirmation was settled somewhere else (the overlay's
+   * Confirm/Cancel buttons, a spoken "yes"/"no", or the gate's timeout). Return
+   * to IDLE so the indicator never claims to still be waiting.
+   */
+  clearConfirmation(): void
   /** Incoming Float32 PCM chunk from the renderer mic capture. */
   acceptAudio(samples: Float32Array): void
   /** Renderer reported a microphone failure (permission/unavailable). */
@@ -106,6 +112,17 @@ export function createVoiceController(deps: VoiceControllerDeps): VoiceControlle
     maxTimer = setTimeout(stopAndExecute, MAX_LISTENING_MS)
   }
 
+  /** Phase from which a new listening session (PTT or wake hand-off) may start. */
+  function canStartListening(): boolean {
+    return (
+      state.phase === 'idle' ||
+      state.phase === 'success' ||
+      state.phase === 'error' ||
+      // A pending confirmation must stay answerable by voice ("yes" / "no").
+      state.phase === 'confirming'
+    )
+  }
+
   async function stopAndExecute(): Promise<void> {
     if (state.phase !== 'listening') return
     clearTimers()
@@ -171,6 +188,29 @@ export function createVoiceController(deps: VoiceControllerDeps): VoiceControlle
         transcript,
         message: response.result.message,
       })
+    } else if (response.kind === 'confirmation') {
+      // V03-S4: HELD at the gate. Nothing was executed. This phase owns no
+      // result timer — the gate owns the lifetime and settles the prompt via
+      // Confirm/Cancel, a spoken "yes"/"no", or its own timeout.
+      setState({
+        phase: 'confirming',
+        partial: '',
+        transcript,
+        message: `${response.request.prompt} Say "yes" to confirm or "no" to cancel.`,
+      })
+      return
+    } else if (response.kind === 'cancelled') {
+      if (response.reason === 'user') {
+        // An explicit rejection is not an error: straight back to idle.
+        toIdle()
+        return
+      }
+      setState({
+        phase: 'error',
+        partial: '',
+        transcript,
+        message: response.message,
+      })
     } else {
       setState({
         phase: 'error',
@@ -188,13 +228,13 @@ export function createVoiceController(deps: VoiceControllerDeps): VoiceControlle
     },
     beginListening(): void {
       if (!isEnabled()) return
-      if (state.phase === 'idle' || state.phase === 'success' || state.phase === 'error') {
+      if (canStartListening()) {
         beginListening()
       }
     },
     togglePtt(): void {
       if (!isEnabled()) return
-      if (state.phase === 'idle' || state.phase === 'success' || state.phase === 'error') {
+      if (canStartListening()) {
         beginListening()
       } else if (state.phase === 'listening') {
         void stopAndExecute()
@@ -209,6 +249,10 @@ export function createVoiceController(deps: VoiceControllerDeps): VoiceControlle
       } catch {
         // ignore
       }
+      toIdle()
+    },
+    clearConfirmation(): void {
+      if (state.phase !== 'confirming') return
       toIdle()
     },
     acceptAudio(samples: Float32Array): void {

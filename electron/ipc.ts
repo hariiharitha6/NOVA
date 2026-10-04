@@ -4,9 +4,15 @@ import { app, ipcMain, BrowserWindow, dialog, screen } from 'electron'
 import { basename, extname } from 'node:path'
 import type { AppRegistry } from './core/app-registry'
 import { sanitizeConfigPatch } from './core/config'
-import { executeCommand, createCommandPipelineDeps } from './core/command-pipeline'
+import {
+  cancelPendingCommand,
+  confirmPendingCommand,
+  executeCommand,
+  createCommandPipelineDeps,
+} from './core/command-pipeline'
 import type { Launcher } from './core/launcher'
-import type { ConfigStore, DisplayInfo, NovaConfig } from './core/types'
+import type { ConfirmationGate } from './core/confirmation'
+import type { ConfirmationRequest, ConfigStore, DisplayInfo, NovaConfig } from './core/types'
 import type { VoiceController } from './core/speech/voice-controller'
 import type { WakeWordController } from './core/speech/wake-controller'
 import type { WindowManager } from './windows'
@@ -21,6 +27,11 @@ export interface IpcDeps {
   manager: WindowManager
   voice: VoiceController
   wake: WakeWordController
+  /**
+   * v0.3 (V03-S4) — the single shared confirmation gate. The typed IPC path and
+   * the voice controller resolve through this same instance.
+   */
+  confirmation: ConfirmationGate
 }
 
 interface PickedPath {
@@ -43,6 +54,18 @@ export function broadcastConfig(configStore: ConfigStore): void {
   const config = configStore.get()
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send('nova:config-changed', config)
+  }
+}
+
+/**
+ * v0.3 (V03-S4) — push the authoritative pending confirmation (or null) to every
+ * window so a prompt can never linger in one surface after it was answered,
+ * cancelled, timed out, or superseded somewhere else.
+ */
+export function broadcastConfirmationState(confirmation: ConfirmationGate): void {
+  const request: ConfirmationRequest | null = confirmation.pending()
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('nova:confirmation-state', request)
   }
 }
 
@@ -71,12 +94,13 @@ function applyVoiceHotkey(
 }
 
 export function registerIpcHandlers(deps: IpcDeps): void {
-  const { configStore, registry, launcher, manager, voice, wake } = deps
+  const { configStore, registry, launcher, manager, voice, wake, confirmation } = deps
 
   const pipeline = createCommandPipelineDeps({
     registry,
     launcher,
     configStore,
+    confirmation,
     onRecent: () => broadcastConfig(configStore),
     // OPEN_SETTINGS reuses the EXISTING settings window owned by the manager.
     openSettings: () => manager.showSettings(),
@@ -178,6 +202,17 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     }
     return executeCommand(raw, pipeline)
   })
+
+  // ─── V03-S4 confirmation gate ────────────────────────────────────────────
+  // The renderer can only ever echo a token it was given. It cannot submit
+  // command data as "confirmed", and the gate answers with the exact command
+  // the token is bound to.
+
+  ipcMain.handle('nova:confirmation-state', () => confirmation.pending())
+
+  ipcMain.handle('nova:confirm-command', (_event, raw: unknown) => confirmPendingCommand(raw, pipeline))
+
+  ipcMain.handle('nova:cancel-command', (_event, raw: unknown) => cancelPendingCommand(raw, pipeline))
 
   ipcMain.handle('nova:registry', () => registry.snapshot())
 

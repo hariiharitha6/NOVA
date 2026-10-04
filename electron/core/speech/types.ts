@@ -1,6 +1,13 @@
 // NOVA v0.2 voice types. Platform-neutral. No Electron imports allowed here.
 
-export type VoicePhase = 'idle' | 'listening' | 'processing' | 'success' | 'error'
+export type VoicePhase =
+  | 'idle'
+  | 'listening'
+  | 'processing'
+  /** V03-S4 — held at the confirmation gate; nothing has been executed yet. */
+  | 'confirming'
+  | 'success'
+  | 'error'
 
 export interface VoiceState {
   phase: VoicePhase

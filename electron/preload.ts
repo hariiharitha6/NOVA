@@ -5,6 +5,11 @@ const nova = {
   getConfig: () => ipcRenderer.invoke('nova:config-get'),
   updateConfig: (patch: unknown) => ipcRenderer.invoke('nova:config-set', patch),
   runCommand: (input: string) => ipcRenderer.invoke('nova:run-command', input),
+  // V03-S4: the renderer may only echo a token it was handed. It has no way to
+  // submit command data as "confirmed".
+  getConfirmationState: () => ipcRenderer.invoke('nova:confirmation-state'),
+  confirmCommand: (token: string) => ipcRenderer.invoke('nova:confirm-command', token),
+  cancelCommand: (token: string) => ipcRenderer.invoke('nova:cancel-command', token),
   getRegistry: () => ipcRenderer.invoke('nova:registry'),
   getStartup: () => ipcRenderer.invoke('nova:startup-get'),
   setStartup: (enable: boolean) => ipcRenderer.send('nova:startup-set', enable),
@@ -35,6 +40,11 @@ const nova = {
   onVoiceState: (cb: (state: unknown) => void) => {
     ipcRenderer.on('nova:voice-state', (_event, state) => cb(state))
     return () => ipcRenderer.removeListener('nova:voice-state', cb)
+  },
+  onConfirmationState: (cb: (request: unknown) => void) => {
+    const listener = (_event: unknown, request: unknown): void => cb(request ?? null)
+    ipcRenderer.on('nova:confirmation-state', listener)
+    return () => ipcRenderer.removeListener('nova:confirmation-state', listener)
   },
   onWakeStatus: (cb: (status: unknown) => void) => {
     ipcRenderer.on('nova:wake-status-changed', (_event, status) => cb(status))

@@ -16,6 +16,8 @@ function statusColor(phase: string): string {
       return '#4ade80'
     case 'error':
       return '#f87171'
+    case 'confirming':
+      return '#fbbf24'
     default:
       return '#a78bfa'
   }
@@ -32,6 +34,8 @@ function statusText(state: {
       return state.partial || 'Listening…'
     case 'processing':
       return 'Processing…'
+    case 'confirming':
+      return state.message || 'Waiting for confirmation…'
     case 'success':
       return state.message || 'Done'
     case 'error':
@@ -104,7 +108,7 @@ export function VoiceIndicator() {
                   fontWeight: 700,
                 }}
               >
-                {state.phase === 'success' ? '✓' : state.phase === 'error' ? '✕' : '…'}
+                {state.phase === 'success' ? '✓' : state.phase === 'error' ? '✕' : state.phase === 'confirming' ? '?' : '…'}
               </div>
             )}
           </div>

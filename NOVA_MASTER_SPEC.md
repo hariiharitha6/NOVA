@@ -632,6 +632,17 @@ High-risk operations include:
 
 These require explicit permissions and/or confirmation.
 
+Current state (V03-S4): NOVA cannot yet delete, overwrite, run terminal commands,
+change system settings, message anyone or place calls, so **no HIGH-risk
+operation is implemented and none is claimed**. The three levels are defined and
+the confirmation boundary is enforced: `LOW` runs immediately (read-only views,
+settings window, fixed-origin search, focus an already-running app, and
+registry-validated sites/files/folders), `MEDIUM` requires an explicit approval
+(starting an application, or any site/file/folder NOVA never vetted), and `HIGH`
+is reserved and already treated as confirmation-required for a future slice.
+Approval is a one-shot opaque token bound to the exact command shown; there is
+deliberately no "always allow" affordance.
+
 Use secure Electron architecture:
 
 -   context isolation
@@ -879,8 +890,18 @@ Build:
     launched), plus `SHOW_FAVORITES` / `SHOW_RECENTS` / `OPEN_SETTINGS` served
     from the existing config store and existing settings window through the one
     shared typed+voice pipeline. See `RTM.md`.
--   **V03-S4..S5 — Planned.** Risk/confirmation enforcement and optional local-AI
-    interpretation are not started.
+-   **V03-S4 — Completed.** Risk classification + confirmation safety layer:
+    `electron/core/risk-policy.ts` is the single deterministic authority for
+    `LOW` / `MEDIUM` / `HIGH` (the parser no longer assigns a risk level, and an
+    unknown intent fails closed to MEDIUM). MEDIUM/HIGH actions are held at one
+    process-wide, token-bound confirmation gate before execution, with a
+    30-second window, supersession by a newer command, replay/stale/forged-token
+    rejection, and invalidation when the overlay hides. Typed and voice input
+    share that single gate; while a prompt is pending, voice additionally accepts
+    a fixed `yes`/`confirm`/`do it` and `no`/`cancel`/`stop` vocabulary, and the
+    renderer can only echo an opaque token. No new execution capability, shell,
+    or model was introduced. See `RTM.md`.
+-   **V03-S5 — Planned.** Optional local-AI interpretation is **not started**.
 
 ### Exit Gate
 

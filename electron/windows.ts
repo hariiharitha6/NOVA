@@ -52,7 +52,19 @@ function loadView(win: BrowserWindow, view: string): void {
   }
 }
 
-export function createWindowManager(configStore: ConfigStore): WindowManager {
+export interface WindowManagerOptions {
+  /**
+   * v0.3 (V03-S4) — called every time the overlay is hidden (hotkey, tray,
+   * Escape, IPC). Used to invalidate a pending confirmation, so a prompt can
+   * never stay armed while nothing is on screen to answer it.
+   */
+  onOverlayHidden?: () => void
+}
+
+export function createWindowManager(
+  configStore: ConfigStore,
+  options: WindowManagerOptions = {},
+): WindowManager {
   let dot: BrowserWindow | null = null
   let overlay: BrowserWindow | null = null
   let settings: BrowserWindow | null = null
@@ -241,6 +253,7 @@ export function createWindowManager(configStore: ConfigStore): WindowManager {
       overlay.webContents.send('nova:overlay-shown')
     },
     hideOverlay() {
+      options.onOverlayHidden?.()
       if (overlay && !overlay.isDestroyed()) overlay.hide()
     },
     toggleOverlay() {

@@ -299,8 +299,10 @@ deterministic phrase patterns only — free-form natural-language search phrasin
 beyond the patterns above is not recognized and falls back to clarification. The
 `CommandResult` structured response type exists but the search path continues to
 surface via the existing `launched` response (action + LaunchResult) to avoid
-changing v0.2 behavior. Risk/confirmation enforcement (V03-S4) is not yet applied
-beyond the LOW classification recorded on the action.
+changing v0.2 behavior. Risk/confirmation enforcement was not applied in this
+slice beyond the LOW classification recorded on the action; it is enforced in
+**V03-S4** (see below), where that classification was replaced by a real policy
+and gate.
 
 ---
 
@@ -340,8 +342,8 @@ implementation.
   `data` field (`favorites` / `recents` / `settings`) rather than introducing a
   competing result interface; it is purely additive, so v0.2 consumers that
   ignore `data` are unaffected.
-- **V03-S4+ (risk/confirmation enforcement, AI interpretation, automation) are
-  NOT started and remain Planned.**
+- **V03-S4 (risk/confirmation enforcement) is now Completed** — see below.
+  **V03-S5 (AI interpretation) and automation remain Planned.**
 
 | Requirement ID | Version | Epic | Requirement | Acceptance Criteria | Priority | Dependencies | Platform | Status |
 |---|---|---|---|---|---|---|---|---|
@@ -370,12 +372,124 @@ cannot be loaded the service degrades to the `unavailable` outcome ("Focusing X
 isn't available on this system.") instead of throwing. Windows may still apply
 its foreground-lock restrictions in edge cases (e.g. a session with no
 interactive desktop). `SHOW_FAVORITES` / `SHOW_RECENTS` are read-only views of
-existing config — this slice adds no favorite/recent editing commands. Risk and
-confirmation enforcement (V03-S4) is not applied beyond the LOW classification
-recorded on the action. Manual voice/microphone acceptance of spoken focus /
+existing config — this slice adds no favorite/recent editing commands. In this
+slice risk was only the LOW classification recorded on the action; the
+authoritative policy and the confirmation gate are implemented in **V03-S4**
+below. Manual voice/microphone acceptance of spoken focus /
 favorites / recents / settings phrasing remains **Testing — awaiting human
 verification**; the automated suite drives the same shared pipeline through a
 mock recognizer.
+
+---
+
+## v0.3 Slice 4 — Risk Classification + Confirmation Safety Layer (V03-S4)
+
+V03-S4 inserts a **deterministic confirmation boundary** between understanding a
+command and running it. Recognition and risk are now two separate concerns, and
+the risk decision is made by one auditable module — never by the parser and never
+by a model.
+
+- **RISK IS NOT DECIDED BY THE PARSER.** `command-engine.ts` no longer stamps
+  `risk: 'LOW'` on every action. `electron/core/risk-policy.ts` is the single
+  source of truth and classifies every action immediately before the gate. This
+  matters for V03-S5: when optional AI interpretation is added, an interpreted
+  proposal cannot mark itself safe, because the interpreter has no way to
+  contribute a risk level at all.
+- **ONE BOUNDARY, BOTH INPUT PATHS.** The enforced order is
+  `input → intent → StructuredCommand → risk classification → validation →
+  confirmation if MEDIUM/HIGH → execution`. Typed IPC and voice both call the same
+  `executeCommand()`, and **one** `ConfirmationGate` instance is shared by the
+  whole process, so there is exactly one pending confirmation slot.
+- **LOW RUNS, MEDIUM/HIGH WAIT.** `LOW` = no meaningful side effect
+  (`SHOW_FAVORITES`, `SHOW_RECENTS`, `OPEN_SETTINGS`, `SEARCH_WEB`,
+  `SEARCH_YOUTUBE`, `FOCUS_APPLICATION`, `CLARIFICATION`/`UNKNOWN`, and
+  registry-validated website/file/folder targets). `MEDIUM` = a real side effect
+  (`OPEN_APPLICATION`, and any website/file/folder target NOVA never vetted).
+  `HIGH` is reserved and currently assigned to nothing, because no supported NOVA
+  intent is destructive; inventing a dangerous command to exercise the level would
+  be dishonest, but the level exists so the gate already treats it as gated.
+- **FAIL CLOSED, ALWAYS.** An intent the policy does not know classifies as
+  `MEDIUM`, and a pipeline built **without** a gate refuses every gated action
+  (`reason: 'unavailable'`) instead of running it.
+- **THE TOKEN IS THE ONLY KEY.** A pending confirmation holds one random UUID
+  token, compared timing-safely against a canonical-UUID shape check. Only that
+  token can release the **exact action the gate was bound to** — the approval
+  path cannot re-resolve input, re-read intent, or re-classify. The renderer only
+  ever sees `{ prompt, detail, intent, risk, expiresInMs, token }` and echoes the
+  token; no executable command data crosses the IPC boundary. No shell, `eval`,
+  or new process-spawning path was introduced.
+- **ONE SHOT, THEN GONE.** Confirm/cancel invalidate the token synchronously, so
+  replay, a stale dialog, a double click, or a cancel-then-confirm race all execute
+  nothing. A pending confirmation expires after a single 30-second timer (no
+  polling), is superseded immediately by any later command, and is invalidated
+  when the overlay hides so a prompt can never stay armed off-screen.
+- **SPOKEN ANSWERS, ONLY WHEN PENDING.** While a confirmation is pending, voice
+  additionally accepts exactly `yes` / `confirm` / `do it` and `no` / `cancel` /
+  `stop`, matched after normalization against a fixed list. The words are never
+  used as a token — they resolve the token the gate already issued. With nothing
+  pending these words do nothing at all and only acknowledge inertly ("There is
+  nothing to confirm."), and **typed** text is never treated as a confirmation.
+
+| Requirement ID | Version | Epic | Requirement | Acceptance Criteria | Priority | Dependencies | Platform | Status |
+|---|---|---|---|---|---|---|---|---|
+| V03-S4-001 | v0.3 | Architecture | Risk is classified by one policy module, never by the parser | `electron/core/risk-policy.ts` exports `classifyRisk()`, `requiresConfirmation()`, `trustedTargets()`, `withClassifiedRisk()` and is the only writer of `StructuredAction.risk`. `resolveCommand()` returns actions with `risk === undefined`, and `withClassifiedRisk()` does not mutate its input. | High | V03-S1 | Cross-platform | Completed |
+| V03-S4-002 | v0.3 | Security | Deterministic LOW set | `CLARIFICATION`, `UNKNOWN`, `SHOW_FAVORITES`, `SHOW_RECENTS`, `OPEN_SETTINGS`, `SEARCH_WEB`, `SEARCH_YOUTUBE`, `FOCUS_APPLICATION` classify LOW. Tests assert the exact intent **and** level for each. | High | V03-S4-001 | Cross-platform | Completed |
+| V03-S4-003 | v0.3 | Security | Deterministic MEDIUM set | `OPEN_APPLICATION` classifies MEDIUM even when the target is registry-validated, and even when no registry context is supplied. | High | V03-S4-001 | Cross-platform | Completed |
+| V03-S4-004 | v0.3 | Security | Registry-validated target rule | `OPEN_WEBSITE` / `OPEN_FILE` / `OPEN_FOLDER` are LOW only on an exact registry match (`AppEntry.path`, website `url`, `fileFolder.path`); anything else is MEDIUM. Empty registry values are dropped so an empty target can never become "trusted". | High | V03-S4-001 | Cross-platform | Completed |
+| V03-S4-005 | v0.3 | Security | HIGH is reserved, and assigned to nothing today | The policy defines HIGH as gated-by-construction; a test enumerates every currently supported intent and asserts none classifies HIGH, so no destructive action is invented to populate the level. | High | V03-S4-001 | Cross-platform | Completed |
+| V03-S4-006 | v0.3 | Security | Fail closed on an unknown intent | An intent with no policy entry classifies MEDIUM even if the action object claims `risk: 'LOW'`; a caller-supplied level is ignored by both `classifyRisk()` and `withClassifiedRisk()`. | High | V03-S4-001 | Cross-platform | Completed |
+| V03-S4-007 | v0.3 | Execution | LOW executes with no prompt | A LOW command produces a normal `launched`/`result` response, leaves the gate empty, records its recent where applicable, and the executed action carries the stamped `risk: 'LOW'`. | High | V03-S4-002 | Cross-platform | Completed |
+| V03-S4-008 | v0.3 | Security | MEDIUM/HIGH stop before execution | A held command never reaches the launcher: zero launches, zero recents recorded, and `onSettled` has not fired. Tests assert on absence of execution, not just on the response kind. | High | V03-S4-003 | Cross-platform | Completed |
+| V03-S4-009 | v0.3 | Security | The prompt carries no actionable payload | `ConfirmationRequest` has exactly `{ token, prompt, detail?, intent, risk, expiresInMs }`; the resolved app path is absent from the serialized request. | High | V03-S4-008 | Cross-platform | Completed |
+| V03-S4-010 | v0.3 | Execution | Confirm runs exactly the prompted command, once | Approval runs the action the gate was bound to — verified by changing the registry between prompt and approval and asserting the bound target still runs. The approval path performs no re-parsing and re-resolves nothing. | High | V03-S4-008 | Cross-platform | Completed |
+| V03-S4-011 | v0.3 | Execution | Cancel never executes | `cancelPendingCommand()` returns `cancelled` with `reason: 'user'`, launches nothing, records nothing, and the token is dead so a later approval is refused. | High | V03-S4-008 | Cross-platform | Completed |
+| V03-S4-012 | v0.3 | Security | Bounded window with a single timer | `CONFIRMATION_TIMEOUT_MS` is `30_000`. Exactly one timer exists while a prompt is pending (asserted with `vi.getTimerCount()`), it is cleared on answer, and expiry launches nothing and leaves the token invalid. A superseded prompt starts a fresh full-length window rather than inheriting elapsed time. | High | V03-S4-008 | Cross-platform | Completed |
+| V03-S4-013 | v0.3 | Security | Replay, stale and forged tokens are refused | Confirming twice launches once. A forged token (empty, whitespace, `yes`, shell-like text, a SQL-ish string, a path, `null`, a number, an action object, an array) is rejected and leaves the genuine prompt alive. A canonical-but-unissued token is rejected as `mismatch`. Confirm-after-cancel and cancel-after-confirm are both safe. | High | V03-S4-010 | Cross-platform | Completed |
+| V03-S4-014 | v0.3 | Security | One pending slot; a new command supersedes | A second command invalidates the first prompt immediately (`outcome: 'superseded'`), and the older token can never approve the newer command. Valid-but-unrecognised and over-length input does **not** invalidate a pending prompt. | High | V03-S4-013 | Cross-platform | Completed |
+| V03-S4-015 | v0.3 | Security | Hiding the overlay disarms the prompt | `WindowManager` invokes `onOverlayHidden()` on every hide path and main invalidates the pending confirmation, so nothing stays armed off-screen. | High | V03-S4-014 | Cross-platform | Completed |
+| V03-S4-016 | v0.3 | Security | Renderer can submit only a token | Preload exposes `getConfirmationState()`, `confirmCommand(token)`, `cancelCommand(token)` and `onConfirmationState(cb)`; the IPC handlers pass the raw value straight to the gate. There is no channel that accepts command data for execution. | High | V03-S4-010 | Cross-platform | Completed |
+| V03-S4-017 | v0.3 | Security | A missing gate refuses rather than permits | A pipeline with no `confirmation` dep returns `cancelled` with `reason: 'unavailable'` for a gated action and launches nothing; LOW actions are unaffected. | High | V03-S4-007 | Cross-platform | Completed |
+| V03-S4-018 | v0.3 | Voice | Fixed confirmation vocabulary, pending only | `CONFIRM_PHRASES` is exactly `['yes','confirm','do it']` and `CANCEL_PHRASES` is exactly `['no','cancel','stop']`, matched case/punctuation-insensitively; `y`, `yep`, `yes please open chrome` and `do it now` are not phrases. With nothing pending these words execute nothing, open nothing and only acknowledge inertly. | High | V03-S4-010 | Cross-platform | Completed |
+| V03-S4-019 | v0.3 | Voice | Spoken answers can be accepted while confirming | The `confirming` voice phase still starts a listening session, so the prompt is answerable by voice; answering settles the indicator back to `idle`. | High | V03-S4-018 | Cross-platform | Completed |
+| V03-S4-020 | v0.3 | Security | Typed text is never a confirmation | Typing `yes` with a prompt pending is parsed as an ordinary command and returns `clarification`; it cannot approve anything. | High | V03-S4-018 | Cross-platform | Completed |
+| V03-S4-021 | v0.3 | Architecture | Typed and voice parity over one shared gate | Identical command text produces identical responses from both surfaces apart from the opaque token; a voice-raised prompt is answerable through the typed path and a typed prompt through the spoken path, and both share one pending slot. | High | V03-S4-010 | Cross-platform | Completed |
+| V03-S4-022 | v0.3 | UI | Accessible prompt, no redesign | The existing royal-dark overlay is unchanged in design. A pending confirmation renders a `role="dialog"` prompt with `aria-modal`, labelled title/description, read-only input, focus moved to the dialog, `Enter` to confirm, `Esc` to cancel, and reduced-motion support. Every settle outcome (`confirmed`, `cancelled`, `expired`, `superseded`) reaches the UI exactly once, and a throwing listener cannot break the gate. | High | V03-S4-010 | Cross-platform | Completed |
+| V03-S4-023 | v0.3 | UI | Voice indicator reflects the gate | The indicator shows a `confirming` state while a confirmation is pending and returns to idle when it settles anywhere. | High | V03-S4-022 | Cross-platform | Completed |
+| V03-S4-024 | v0.3 | Security | No new execution capability | Comment-stripped source assertions prove the policy, gate and pipeline contain no PowerShell, `cmd.exe`, `shell: true`, `exec`/`execSync`/`execFile`/`spawn`, `eval` or `new Function`; the confirmation layer imports no process or Electron module; the launcher is reachable from exactly one place in the pipeline and that place is downstream of the gate; `windows-launcher.ts` is untouched. | High | All V03-S4 | Cross-platform | Completed |
+| V03-S4-025 | v0.3 | Quality | V03-S4 automated tests | `tests/v03-risk-confirmation.test.ts` (86 tests) covers classification, LOW execution, gated-before-execution, confirm-exactly-once, cancel, timeout/single timer, replay, stale/forged tokens, supersession, spoken confirm/cancel, typed-voice parity, UI state transitions, and the security boundary. No GUI, browser or physical microphone required. | High | All V03-S4 | Cross-platform | Completed |
+| V03-S4-026 | v0.3 | Quality | Clean TypeScript/build + regression | `npx tsc --noEmit` exits 0, `npm run build` succeeds, and all pre-existing v0.1/v0.2/V03-S1/S2/S3 tests continue to pass (341/341 total after V03-S4, including the new suite). | High | All V03-S4 | Cross-platform | Completed |
+
+**Executability:** All 26 requirements are backed by executable code and 86 new
+automated tests. `classifyRisk()` is pure and directly unit-tested, and the gate is
+tested through fake timers for expiry and for the "exactly one timer" property.
+
+**Risks:** The main behavioural change for users is that launching an application
+now asks first, which is the point of the slice. Because V03-S1–S3 recorded
+`risk: 'LOW'` on every action, any code that trusted that field is now reading an
+authoritative classification instead — nothing in the repository did. The gate's
+30-second window is short by design; a user who ignores the prompt gets a
+"no longer valid" answer rather than a surprise execution.
+
+**Dependencies:** V03-S1 (`StructuredAction`/`Intent`), V03-S2/S3 (the real
+launch/focus execution paths that are now gated). No new runtime dependency, no
+model, and no native binding were added.
+
+**Open questions (for a later slice, not decided here):** whether a
+remember-always answer should ever be possible for a validated app (the current
+design deliberately has no such affordance), and whether a future destructive
+intent should get its own timeout or a stricter prompt than the generic HIGH
+wording.
+
+**Known limitations (honest):** Confirmation is in-process and per-command — there
+is no persistence of an armed prompt across a restart, and no allow-list that
+would let a validated app skip confirmation. `HIGH` has no live example because
+nothing NOVA can currently do is destructive. A confirmation cannot be answered
+from a surface that has not yet been implemented (e.g. a future tray menu). The
+spoken vocabulary is intentionally minimal: a user who says "yeah, go ahead" gets
+no confirmation and no execution. Manual microphone/spoken acceptance of the
+confirmation flow remains **Testing — awaiting human verification**; the automated
+suite drives the same shared pipeline and the real voice controller through a mock
+recognizer.
 
 ---
 
@@ -426,3 +540,13 @@ mock recognizer.
   level, including a **live Windows test that actually focuses a running
   application window** and asserts the matched PID and window title. Manual
   spoken/microphone acceptance remains **Testing — awaiting human verification**.
+- **V03-S4-*** — v0.3 Slice 4 (risk classification + confirmation safety layer).
+  Implemented; automated checks clean. Status **Completed** at the code/test
+  level: deterministic risk policy (`LOW`/`MEDIUM`/`HIGH`, fail-closed) enforced by
+  one process-wide, token-bound confirmation gate that both the typed and voice
+  paths share, with a 30-second window, supersession, replay/stale rejection, and
+  a fixed spoken yes/no vocabulary active only while a prompt is pending.
+  Manual spoken/microphone acceptance of the confirmation flow remains
+  **Testing — awaiting human verification**.
+- **V03-S5** (optional local-AI interpretation) and v0.3 automation are **not
+  started** and remain Planned.
