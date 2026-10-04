@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "framer-motion": "^11.3.28",
+    "koffi": "^3.3.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "sherpa-onnx": "^1.13.5",
@@ -62,6 +63,8 @@
     ],
     "asarUnpack": [
       "node_modules/sherpa-onnx/**/*",
+      "node_modules/koffi/**/*",
+      "node_modules/@koromix/**/*",
       "resources/models/**/*"
     ]
   }

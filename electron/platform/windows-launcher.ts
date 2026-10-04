@@ -6,6 +6,8 @@ import { shell } from 'electron'
 import { spawn } from 'node:child_process'
 import type { Launcher } from '../core/launcher'
 import type { LaunchResult, StructuredAction } from '../core/types'
+import { executeFocusApplication } from '../core/app-focus-executor'
+import { createWindowsApplicationFocusService } from './windows-app-focus'
 
 const SAFE_URL = /^https?:\/\//i
 const EXECUTABLE = /\.exe$/i
@@ -59,6 +61,8 @@ async function openUrl(url: string, label: string): Promise<LaunchResult> {
 }
 
 export function createWindowsLauncher(): Launcher {
+  // Platform-specific focus backend. Core never sees the Win32 implementation.
+  const focusService = createWindowsApplicationFocusService()
   return {
     async launch(action: StructuredAction): Promise<LaunchResult> {
       switch (action.intent) {
@@ -73,6 +77,9 @@ export function createWindowsLauncher(): Launcher {
         case 'SEARCH_YOUTUBE':
         case 'OPEN_WEBSITE':
           return openUrl(action.target, action.label)
+        // Focus an ALREADY RUNNING window. Never launches a second copy.
+        case 'FOCUS_APPLICATION':
+          return executeFocusApplication(action, { focusService })
         case 'CLARIFICATION':
           return { ok: false, message: 'Clarification needed', label: action.label }
         default:

@@ -873,8 +873,14 @@ Build:
 -   **V03-S2 — Completed.** Search intent execution: fixed trusted Google/YouTube
     origins, `encodeURIComponent`-encoded queries, http(s)-only execution through
     the shared launcher, empty-query clarification, and tests. See `RTM.md`.
--   **V03-S3..S5 — Planned.** App focus execution/workflows, risk/confirmation
-    enforcement, and optional local-AI interpretation are not started.
+-   **V03-S3 — Completed.** App focus + rich launcher actions: real
+    `FOCUS_APPLICATION` execution via the Win32 API (no shell/PowerShell; an
+    already-running window is activated and a not-running app is reported, never
+    launched), plus `SHOW_FAVORITES` / `SHOW_RECENTS` / `OPEN_SETTINGS` served
+    from the existing config store and existing settings window through the one
+    shared typed+voice pipeline. See `RTM.md`.
+-   **V03-S4..S5 — Planned.** Risk/confirmation enforcement and optional local-AI
+    interpretation are not started.
 
 ### Exit Gate
 

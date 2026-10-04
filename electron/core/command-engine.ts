@@ -172,6 +172,8 @@ export function resolveCommand(
   if (raw.match(/^focus\s+(.+)$/i) || raw.match(/^bring\s+(.+)\s+to\s+front$/i) || raw.match(/^switch\s+to\s+(.+)$/i)) {
     const focusMatch = raw.match(/^focus\s+(.+)$/i) ?? raw.match(/^bring\s+(.+)\s+to\s+front$/i) ?? raw.match(/^switch\s+to\s+(.+)$/i)
     const focusTerm = focusMatch ? focusMatch[1].trim() : ''
+    // The target is always resolved against the validated registry, so a focus
+    // command can never carry raw user text into the platform layer.
     const app = registry.apps.find((a) => aliasMatch(focusTerm, [a.name], a.aliases))
     if (app) {
       return { intent: 'FOCUS_APPLICATION', target: app.path, label: app.name, risk: 'LOW' }
@@ -180,6 +182,12 @@ export function resolveCommand(
     if (appLike) {
       return { intent: 'FOCUS_APPLICATION', target: appLike.path, label: appLike.name, risk: 'LOW' }
     }
+    // Unknown focus target: clarify instead of falling through to OPEN_*.
+    // FOCUS_APPLICATION must never be downgraded into a launch.
+    return clarification(
+      `Could not find "${focusTerm}"`,
+      'Focus needs an app NOVA already knows. Add it in Settings, or use "Open <App>" to start it.',
+    )
   }
 
   const openMatch = raw.match(/^open\s+(.+)$/i) ?? raw.match(/^launch\s+(.+)$/i) ?? raw.match(/^start\s+(.+)$/i)

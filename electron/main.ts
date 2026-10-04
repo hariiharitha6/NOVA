@@ -9,7 +9,7 @@ import { seedDefaultFileFolders } from './platform/windows-shortcuts'
 import { createWindowManager } from './windows'
 import { registerHotkey, unregisterAllHotkeys, registerPttHotkey, registerEscapeCancel, unregisterEscapeCancel } from './hotkey'
 import { registerIpcHandlers, broadcastConfig } from './ipc'
-import { executeCommand } from './core/command-pipeline'
+import { executeCommand, createCommandPipelineDeps } from './core/command-pipeline'
 import { migrateShortcutDefaults } from './core/shortcut-policy'
 import { createTray } from './tray'
 import { createSherpaSpeechRecognizer } from './core/speech/sherpa-recognizer'
@@ -75,12 +75,18 @@ if (!gotTheLock) {
       recognizer,
       isEnabled: () => configStore.get().voiceEnabled,
       executeCommand: (input) =>
-        executeCommand(input, {
-          configStore,
-          registry,
-          launcher,
-          onRecent: () => broadcastConfig(configStore),
-        }),
+        // SAME pipeline factory as the typed IPC path, so voice and typed input
+        // can never diverge (focus / favorites / recents / settings included).
+        executeCommand(
+          input,
+          createCommandPipelineDeps({
+            configStore,
+            registry,
+            launcher,
+            onRecent: () => broadcastConfig(configStore),
+            openSettings: () => windowManager?.showSettings(),
+          }),
+        ),
       emit: (state) => {
         windowManager?.setVoiceMode(state.phase !== 'idle')
         if (state.phase === 'listening') {

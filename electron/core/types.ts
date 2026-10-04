@@ -126,11 +126,24 @@ export interface LaunchResult {
   label: string
 }
 
+/**
+ * v0.3 (V03-S3) — structured payload carried by a CommandResult so the renderer
+ * can render real data (favorites / recents) or react to a settings action
+ * without re-querying or inventing its own store. Purely additive: v0.2
+ * consumers that ignore `data` keep working unchanged.
+ */
+export type CommandResultData =
+  | { kind: 'favorites'; items: RecentItem[]; total: number }
+  | { kind: 'recents'; items: RecentItem[]; total: number }
+  | { kind: 'settings'; action: 'open-settings' }
+
 export interface CommandResult {
   success: boolean
   intent: Intent
   message: string
   action?: StructuredAction
+  /** Present only when the intent returns renderable data (V03-S3+). */
+  data?: CommandResultData
 }
 
 export type CommandResponse =

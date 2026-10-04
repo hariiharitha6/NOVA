@@ -120,7 +120,22 @@ export function CommandOverlay() {
       ? { intent: feedback.result.intent, target: '', label: feedback.result.message, risk: 'LOW' as const }
       : null
   const isLaunched = feedback?.kind === 'launched'
-  const isOk = isLaunched && feedback.result.ok
+  const isResult = feedback?.kind === 'result'
+  const isOk = isLaunched ? feedback.result.ok : isResult && feedback.result.success
+  // Prefer the executor's own message (e.g. "Chrome is now focused.") over a
+  // generic "Launched <label>", which would be wrong for non-launch intents.
+  const statusText = isLaunched
+    ? feedback.result.message || `Launched ${feedback.result.label}`
+    : isResult
+      ? feedback.result.message
+      : feedbackAction?.label ?? ''
+  // V03-S3: real favorites / recents returned by the command pipeline.
+  const listData =
+    feedback?.kind === 'result' && feedback.result.data &&
+    (feedback.result.data.kind === 'favorites' || feedback.result.data.kind === 'recents')
+      ? feedback.result.data
+      : null
+  const listTitle = listData?.kind === 'favorites' ? 'FAVORITES' : 'RECENT'
 
   return (
     <div
@@ -220,8 +235,28 @@ export function CommandOverlay() {
                   }}
                 >
                   <span>{isOk ? '✓' : feedbackAction.intent === 'CLARIFICATION' ? '?' : '✕'}</span>
-                  <span>{isOk ? `Launched ${feedback.result.label}` : feedbackAction.label}</span>
+                  <span>{statusText}</span>
                 </div>
+                {listData && listData.items.length > 0 ? (
+                  <div style={{ marginTop: 12 }} role="list" aria-label={listTitle === 'FAVORITES' ? 'Favorites' : 'Recent apps'}>
+                    <div style={{ color: 'rgba(148,163,184,0.6)', fontSize: 11, letterSpacing: '0.1em' }}>
+                      {listTitle}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                      {listData.items.map((item) => (
+                        <button
+                          key={item.id}
+                          role="listitem"
+                          className="quick-action-btn"
+                          style={{ minWidth: 0, padding: '8px 14px', borderRadius: 999 }}
+                          onClick={() => runSuggestion(`Open ${item.label}`)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 {feedbackAction.description ? (
                   <div style={{ color: 'rgba(148,163,184,0.85)', fontSize: 13, marginTop: 6 }}>
                     {feedbackAction.description}

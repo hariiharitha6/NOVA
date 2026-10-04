@@ -4,7 +4,7 @@ import { app, ipcMain, BrowserWindow, dialog, screen } from 'electron'
 import { basename, extname } from 'node:path'
 import type { AppRegistry } from './core/app-registry'
 import { sanitizeConfigPatch } from './core/config'
-import { executeCommand } from './core/command-pipeline'
+import { executeCommand, createCommandPipelineDeps } from './core/command-pipeline'
 import type { Launcher } from './core/launcher'
 import type { ConfigStore, DisplayInfo, NovaConfig } from './core/types'
 import type { VoiceController } from './core/speech/voice-controller'
@@ -73,12 +73,14 @@ function applyVoiceHotkey(
 export function registerIpcHandlers(deps: IpcDeps): void {
   const { configStore, registry, launcher, manager, voice, wake } = deps
 
-  const pipeline = {
+  const pipeline = createCommandPipelineDeps({
     registry,
     launcher,
     configStore,
     onRecent: () => broadcastConfig(configStore),
-  }
+    // OPEN_SETTINGS reuses the EXISTING settings window owned by the manager.
+    openSettings: () => manager.showSettings(),
+  })
 
   ipcMain.handle('nova:config-get', () => configStore.get())
 

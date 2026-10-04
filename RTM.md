@@ -278,8 +278,9 @@ by typed and voice commands. No new parser and no separate voice path were added
 - **PIPELINE = SHARED.** Search intents are handled by the existing
   `windows-launcher.ts` `openUrl()` path (http(s) only) alongside `OPEN_WEBSITE`.
 - **EMPTY QUERY = CLARIFICATION.** Blank queries never launch a search.
-- **V03-S3+ (focus/workflows), V03-S4 (risk/confirmation enforcement), V03-S5
-  (AI interpretation) are NOT started and remain Planned.**
+- **V03-S3 (focus + rich launcher actions) is now Completed** — see below.
+  **V03-S4 (risk/confirmation enforcement), V03-S5 (AI interpretation) and
+  later slices are NOT started and remain Planned.**
 
 | Requirement ID | Version | Epic | Requirement | Acceptance Criteria | Priority | Dependencies | Platform | Status |
 |---|---|---|---|---|---|---|---|---|
@@ -300,6 +301,81 @@ beyond the patterns above is not recognized and falls back to clarification. The
 surface via the existing `launched` response (action + LaunchResult) to avoid
 changing v0.2 behavior. Risk/confirmation enforcement (V03-S4) is not yet applied
 beyond the LOW classification recorded on the action.
+
+---
+
+## v0.3 Slice 3 — Application Focus + Rich Launcher Actions (V03-S3)
+
+V03-S3 completes **real execution** for the four intents recognised since V03-S1.
+All four run through the **same shared `executeCommand()` → `resolveCommand()`
+pipeline** used by typed and voice input; a single
+`createCommandPipelineDeps()` factory builds the dependency set for *both* input
+paths so they cannot drift. No intent has a voice-only or typed-only
+implementation.
+
+- **FOCUS_APPLICATION = FOCUS, NEVER LAUNCH.** The target is resolved against
+  the validated registry, so the platform layer only ever receives
+  `AppEntry.path` + `AppEntry.name`. An already-running window is activated; if
+  the app is not running a structured "isn't currently running" result is
+  returned. It is **never** converted into `OPEN_APPLICATION`, and **no process
+  is ever started for the target**.
+- **NO SHELL, EVER.** Focus uses the Win32 API (`user32.dll`) through the
+  Node-API FFI binding `koffi` (`EnumWindows`, `GetWindowThreadProcessId`,
+  `AttachThreadInput`, `ShowWindow`, `BringWindowToTop`, `SetForegroundWindow`).
+  `cmd.exe`, PowerShell, `wscript`, `shell: true`, `eval` and `new Function` are
+  absent. The only child process spawned is the **fixed** system binary
+  `System32\tasklist.exe`, with `shell: false` and a **constant** argv
+  (`/FO CSV /NH`) — no user or registry text is ever passed to it; its output is
+  parsed in-process and compared against validated image names.
+- **EXISTING DATA SOURCES ONLY.** `SHOW_FAVORITES` and `SHOW_RECENTS` read the
+  existing `NovaConfig.favorites` / `NovaConfig.recents` (the same store the
+  overlay and Settings already use). No second favorites or recents database was
+  created. Empty state returns a clean result and fabricates nothing; an
+  unresolvable favorite id falls back to the stored id rather than an invented
+  label.
+- **EXISTING SETTINGS ARCHITECTURE.** `OPEN_SETTINGS` calls the existing
+  `WindowManager.showSettings()` through an injected `openSettings` hook. No
+  duplicate settings window is created.
+- **STRUCTURED RESULT MODEL.** `CommandResult` was **extended** with an optional
+  `data` field (`favorites` / `recents` / `settings`) rather than introducing a
+  competing result interface; it is purely additive, so v0.2 consumers that
+  ignore `data` are unaffected.
+- **V03-S4+ (risk/confirmation enforcement, AI interpretation, automation) are
+  NOT started and remain Planned.**
+
+| Requirement ID | Version | Epic | Requirement | Acceptance Criteria | Priority | Dependencies | Platform | Status |
+|---|---|---|---|---|---|---|---|---|
+| V03-S3-001 | v0.3 | Execution | Real FOCUS_APPLICATION execution | `focus <app>` / `switch to <app>` / `bring <app> to front` resolve to `FOCUS_APPLICATION` with the registry `AppEntry.path` as target and reach `windows-launcher.ts` → `executeFocusApplication()` → `WindowsApplicationFocusService`, which activates an existing top-level window. A live Windows test asserts a real window is focused (matched PID + title). | High | V03-S1 | Windows | Completed |
+| V03-S3-002 | v0.3 | Command Engine | Focus alias + phrasing resolution | Known app by name, by alias (`chrome`, `vscode`, `vs code`, `explorer`), and by `switch to` / `bring ... to front` phrasing all resolve to the registry entry. Unknown targets return `CLARIFICATION` and never fall through to an `OPEN_*` intent. | High | V03-S3-001 | Cross-platform | Completed |
+| V03-S3-003 | v0.3 | Execution | Not-running is structured, not a launch | When the target is not running the service returns the `not-running` outcome and the user sees "<App> isn't currently running." The launcher receives exactly one `FOCUS_APPLICATION` action, no `OPEN_APPLICATION`, and no recent is recorded. | High | V03-S3-001 | Windows | Completed |
+| V03-S3-004 | v0.3 | Security | No shell execution in the focus path | The focus implementation contains no PowerShell, `cmd.exe`, `cmd /c`, `shell: true`, `exec`/`execSync`/`execFile`, `eval` or `new Function`. Verified by comment-stripped source assertions plus a single-spawn/constant-argv assertion. | High | V03-S3-001 | Windows | Completed |
+| V03-S3-005 | v0.3 | Security | No arbitrary process execution | Only `System32\tasklist.exe` is spawned, with `shell: false` and constant argv `/FO CSV /NH`. The argv references no request-derived value. Process image names are validated against `SAFE_IMAGE_NAME`; anything that fails validation yields zero candidates. | High | V03-S3-004 | Windows | Completed |
+| V03-S3-006 | v0.3 | Security | No arbitrary executable path | The focus target always originates from the validated registry. Derived image names come only from the executable basename; a `.lnk` shortcut yields no candidates and cannot be focused. Hostile input (`& ; $() backtick pipe`) never reaches the platform layer as a target. | High | V03-S3-005 | Cross-platform | Completed |
+| V03-S3-007 | v0.3 | Execution | SHOW_FAVORITES returns real data | Reads `NovaConfig.favorites`, resolves labels from the registry snapshot, and returns `data: { kind: 'favorites', items, total }` via the existing `result` CommandResponse. Message is "Here are your favorites." | High | V03-S1 | Cross-platform | Completed |
+| V03-S3-008 | v0.3 | Execution | SHOW_FAVORITES empty state | With no favorites configured the result is clean and non-fabricated: "No favorites are configured yet." with `items: []`, `total: 0`. | High | V03-S3-007 | Cross-platform | Completed |
+| V03-S3-009 | v0.3 | Execution | SHOW_RECENTS returns real data | Reads `NovaConfig.recents` and returns `data: { kind: 'recents', items, total }`. Viewing recents does not itself record a recent (no feedback loop). | High | V03-S1 | Cross-platform | Completed |
+| V03-S3-010 | v0.3 | Execution | SHOW_RECENTS empty state | With no recents the result is clean and non-fabricated: "No recent apps yet." with `items: []`, `total: 0`. | High | V03-S3-009 | Cross-platform | Completed |
+| V03-S3-011 | v0.3 | Execution | OPEN_SETTINGS reuses the existing settings window | Calls the existing `WindowManager.showSettings()` through the injected `openSettings` hook and returns "Opening NOVA settings." with `data: { kind: 'settings', action: 'open-settings' }`. No second settings window, and no launcher involvement. | High | V03-S1 | Cross-platform | Completed |
+| V03-S3-012 | v0.3 | Architecture | One shared pipeline for typed and voice | Both the typed IPC handler and the voice controller build deps via `createCommandPipelineDeps()` and call the same `executeCommand()`. Tests assert identical results, identical focus-service calls and identical intents for focus/favorites/settings across both input paths. | High | V03-S3-001 | Cross-platform | Completed |
+| V03-S3-013 | v0.3 | UI | Minimal structured rendering | The existing royal-dark overlay is unchanged in design; it only renders the returned message plus the favorites/recents list, an empty state, and a not-found/not-running state. Added `role="list"`/`role="listitem"`/`aria-label`; existing logo, floating dot, animations, reduced-motion and keyboard navigation are untouched. | High | V03-S3-007 | Cross-platform | Completed |
+| V03-S3-014 | v0.3 | Quality | V03-S3 automated tests | `tests/v03-app-actions.test.ts` (46 tests) covers focus known app / alias / running / not-running / unknown / no-launch-when-not-running, favorites populated + empty, recents populated + empty, settings action, the security suite, shared typed+voice pipeline, and a live Windows backend test. No GUI or physical microphone required. | High | All V03-S3 | Cross-platform | Completed |
+| V03-S3-015 | v0.3 | Quality | Clean TypeScript/build + regression | `npx tsc --noEmit` exits 0, `npm run build` succeeds, and all pre-existing v0.1/v0.2/V03-S1/V03-S2 tests continue to pass (255/255 total after V03-S3, including the new suite). | High | All V03-S3 | Cross-platform | Completed |
+
+**Known limitations (honest):** Focus requires a running instance that owns a
+visible top-level window with a title, and the process image name must match the
+registry entry's executable basename — Start Menu `.lnk` entries and apps whose
+window title is empty cannot be focused and correctly report "isn't currently
+running". Window activation depends on the optional native `koffi` binding; if it
+cannot be loaded the service degrades to the `unavailable` outcome ("Focusing X
+isn't available on this system.") instead of throwing. Windows may still apply
+its foreground-lock restrictions in edge cases (e.g. a session with no
+interactive desktop). `SHOW_FAVORITES` / `SHOW_RECENTS` are read-only views of
+existing config — this slice adds no favorite/recent editing commands. Risk and
+confirmation enforcement (V03-S4) is not applied beyond the LOW classification
+recorded on the action. Manual voice/microphone acceptance of spoken focus /
+favorites / recents / settings phrasing remains **Testing — awaiting human
+verification**; the automated suite drives the same shared pipeline through a
+mock recognizer.
 
 ---
 
@@ -345,3 +421,8 @@ beyond the LOW classification recorded on the action.
   automated checks clean. Status **Completed** at the code/test level. Manual
   browser/voice verification of a live search is **Testing — awaiting human
   verification**.
+- **V03-S3-*** — v0.3 Slice 3 (application focus + rich launcher actions).
+  Implemented; automated checks clean. Status **Completed** at the code/test
+  level, including a **live Windows test that actually focuses a running
+  application window** and asserts the matched PID and window title. Manual
+  spoken/microphone acceptance remains **Testing — awaiting human verification**.
