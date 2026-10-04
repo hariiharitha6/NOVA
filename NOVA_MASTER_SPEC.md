@@ -632,7 +632,7 @@ High-risk operations include:
 
 These require explicit permissions and/or confirmation.
 
-Current state (V03-S4): NOVA cannot yet delete, overwrite, run terminal commands,
+Current state (V03-S5): NOVA cannot yet delete, overwrite, run terminal commands,
 change system settings, message anyone or place calls, so **no HIGH-risk
 operation is implemented and none is claimed**. The three levels are defined and
 the confirmation boundary is enforced: `LOW` runs immediately (read-only views,
@@ -642,6 +642,12 @@ registry-validated sites/files/folders), `MEDIUM` requires an explicit approval
 is reserved and already treated as confirmation-required for a future slice.
 Approval is a one-shot opaque token bound to the exact command shown; there is
 deliberately no "always allow" affordance.
+
+The optional local AI of V03-S5 does not widen this boundary. A model may only
+name an intent and a target; it cannot state a risk level, supply a path or URL,
+name an executable, or invoke anything. Every interpreted command is classified by
+`risk-policy.ts` exactly like a deterministic one, and an interpreted app launch
+or an unvetted origin is confirmed exactly like a typed one.
 
 Use secure Electron architecture:
 
@@ -901,7 +907,27 @@ Build:
     a fixed `yes`/`confirm`/`do it` and `no`/`cancel`/`stop` vocabulary, and the
     renderer can only echo an opaque token. No new execution capability, shell,
     or model was introduced. See `RTM.md`.
--   **V03-S5 — Planned.** Optional local-AI interpretation is **not started**.
+-   **V03-S5 — Completed.** Optional **local-only** AI interpretation, as a
+    deterministic fallback only: `electron/core/ai/` adds a provider-neutral
+    `CommandInterpreter` seam, a constrained selector prompt, a strict
+    deterministic validator (`validateProposal`) that rejects every field outside
+    `intent`/`target`/`arguments.query`/`confidence` and every intent outside a
+    fixed allowlist, and a deterministic resolver (`resolveProposal`) that turns
+    the model's NAME into a `StructuredAction` using NOVA's own registry. The
+    model never supplies a path, URL, protocol, shell text, process argument, risk
+    level or executor field, and `risk` is not even an accepted key. The AI layer
+    imports no launcher, gate, risk policy, Electron, IPC, process or filesystem
+    module. Recognised commands NEVER reach the model; only a deterministic
+    `CLARIFICATION` does, and whatever comes back then re-enters the same
+    `classifyRisk` -> confirmation gate -> launcher path. The local provider is an
+    Ollama-compatible `/api/chat` adapter restricted structurally to loopback
+    addresses (`assertLoopbackUrl` refuses anything else, so no code path can
+    reach a remote host), with no auth header, no telemetry and no cloud
+    fallback. Construction is lazy, configuration defaults to OFF, a request is
+    bounded by an 8s timeout (clamped 1-30s), and every failure — unavailable
+    service, timeout, prose instead of JSON, disallowed intent, unresolvable
+    name, below-threshold confidence — degrades to a clarification. NOVA never
+    downloads a model. See `RTM.md`.
 
 ### Exit Gate
 

@@ -4,6 +4,7 @@ import type { CommandSource } from '../electron/core/command-engine'
 import { executeCommand } from '../electron/core/command-pipeline'
 import type { CommandPipelineDeps } from '../electron/core/command-pipeline'
 import type { LaunchResult, NovaConfig, RegistrySnapshot, StructuredAction } from '../electron/core/types'
+import { defaultConfig } from '../electron/core/types'
 
 const registry: CommandSource = {
   apps: [],
@@ -14,11 +15,7 @@ const registry: CommandSource = {
 function makePipeline(): { deps: CommandPipelineDeps; launched: StructuredAction[] } {
   const launched: StructuredAction[] = []
   const config: NovaConfig = {
-    version: 1,
-    hotkey: 'Control+J',
-    alwaysOnTop: true,
-    startup: false,
-    position: null,
+    ...defaultConfig(),
     favorites: [],
     recents: [],
     customApps: [],
@@ -26,7 +23,6 @@ function makePipeline(): { deps: CommandPipelineDeps; launched: StructuredAction
     fileFolders: [],
     defaultsSeeded: false,
     voiceEnabled: false,
-    pttHotkey: 'Control+Shift+J',
     speechLanguage: 'en-US',
     wakeWordEnabled: false,
     wakeWord: 'Hey NOVA',

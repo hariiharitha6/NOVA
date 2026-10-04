@@ -12,6 +12,7 @@ import {
 } from './core/command-pipeline'
 import type { Launcher } from './core/launcher'
 import type { ConfirmationGate } from './core/confirmation'
+import type { CommandInterpreter } from './core/ai/types'
 import type { ConfirmationRequest, ConfigStore, DisplayInfo, NovaConfig } from './core/types'
 import type { VoiceController } from './core/speech/voice-controller'
 import type { WakeWordController } from './core/speech/wake-controller'
@@ -32,6 +33,12 @@ export interface IpcDeps {
    * the voice controller resolve through this same instance.
    */
   confirmation: ConfirmationGate
+  /**
+   * v0.3 (V03-S5) — OPTIONAL local AI interpreter resolver. Injected (rather than
+   * constructed here) so the local model client is built lazily on first use and
+   * never during startup. Returning null means AI interpretation is off.
+   */
+  interpreter?: () => CommandInterpreter | null
 }
 
 interface PickedPath {
@@ -94,13 +101,16 @@ function applyVoiceHotkey(
 }
 
 export function registerIpcHandlers(deps: IpcDeps): void {
-  const { configStore, registry, launcher, manager, voice, wake, confirmation } = deps
+  const { configStore, registry, launcher, manager, voice, wake, confirmation, interpreter } = deps
 
   const pipeline = createCommandPipelineDeps({
     registry,
     launcher,
     configStore,
     confirmation,
+    // The typed path gets the SAME lazy resolver as the voice path, so a command
+    // interpreted by voice and the same command typed behave identically.
+    interpreter,
     onRecent: () => broadcastConfig(configStore),
     // OPEN_SETTINGS reuses the EXISTING settings window owned by the manager.
     openSettings: () => manager.showSettings(),

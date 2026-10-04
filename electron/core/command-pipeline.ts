@@ -11,19 +11,29 @@
 // The executor is never reached directly by the renderer, by IPC, or by the
 // voice controller: they can only submit TEXT here, and text alone can never
 // satisfy a confirmation — only the gate's opaque token can.
+//
+// v0.3 (V03-S5) — an OPTIONAL local AI interpreter is inserted as a FALLBACK
+// only, behind deterministic recognition:
+//
+//   input -> deterministic engine --recognised--> existing path (unchanged)
+//         --unrecognised--> local AI -> proposal -> strict validation
+//                        -> deterministic resolution -> risk policy
+//                        -> confirmation gate -> existing executor
+//
+// The AI is an interpreter, never an executor. It proposes a NAME; NOVA resolves,
+// classifies, gates and runs it.
 
-import type {
-  CommandResponse,
-  ConfigStore,
-  NovaConfig,
-  RegistrySnapshot,
-  StructuredAction,
-} from './types'
+import type { CommandResponse, ConfigStore, NovaConfig, RegistrySnapshot, StructuredAction } from './types'
 import type { Launcher } from './launcher'
 import type { ConfirmationGate, ConfirmationPhrase } from './confirmation'
+import type { CommandInterpreter } from './ai/types'
 import { buildConfirmationPrompt, resolveConfirmationPhrase } from './confirmation'
 import { classifyRisk, requiresConfirmation, trustedTargets } from './risk-policy'
 import { resolveCommand } from './command-engine'
+import { explainFailure } from './ai/interpreter'
+import { interpretationContext } from './ai/types'
+import { resolveProposal } from './ai/resolve-proposal'
+import { AI_FALLBACK_HINT } from './ai/constants'
 import {
   executeOpenSettings,
   executeShowFavorites,
@@ -49,10 +59,23 @@ export interface CommandPipelineDeps {
    * paths resolve through exactly the same mechanism.
    *
    * Fail closed: when it is absent the pipeline still refuses every
-   * confirmation-required action, so a missing gate can never widen what NOVA
-   * is allowed to run.
+   * confirmation-required action, so a missing gate can never widen what NOVA is
+   * allowed to run.
    */
   confirmation?: ConfirmationGate
+  /**
+   * v0.3 (V03-S5) — OPTIONAL local AI interpretation, used ONLY as a fallback for
+   * commands the deterministic engine did not recognise.
+   *
+   * A resolver function, not an instance, so the local provider is constructed
+   * lazily on first use and never during startup. Returning null (the default
+   * when the feature is off) means NOVA behaves exactly as it did before: the
+   * interpreter is never consulted and no AI code runs at all.
+   *
+   * The interpreter is given no capability beyond proposing a name: it never
+   * receives the launcher, the gate, IPC, Electron, or any filesystem handle.
+   */
+  interpreter?: () => CommandInterpreter | null
 }
 
 export const MAX_INPUT_LENGTH = 200
@@ -194,6 +217,67 @@ async function respondToVoicePhrase(
     : cancelPendingCommand(request.token, deps)
 }
 
+/**
+ * v0.3 (V03-S5) — OPTIONAL local-AI interpretation fallback.
+ *
+ * Called ONLY when the deterministic engine returned CLARIFICATION. That single
+ * guard is what makes this safe to have at all: a command NOVA already understands
+ * is never re-interpreted, so the AI can never reinterpret "open chrome" as
+ * something else, and every recognised command keeps its exact V03-S1..S4
+ * behaviour, speed and privacy.
+ *
+ * Whatever comes back is still only a NAME. It is resolved against the validated
+ * registry here and then handed to the SAME `gateAndRun` used by deterministic
+ * commands, so risk classification, confirmation and execution are identical
+ * whether a human pattern or a local model chose the intent.
+ */
+async function interpretFallback(
+  raw: string,
+  deps: CommandPipelineDeps,
+  snapshot: RegistrySnapshot,
+): Promise<
+  | { kind: 'action'; action: StructuredAction }
+  | { kind: 'failed'; message: string }
+  | { kind: 'absent' }
+> {
+  const interpreter = deps.interpreter?.()
+  if (!interpreter) return { kind: 'absent' }
+
+  let outcome
+  try {
+    outcome = await interpreter.interpret(raw, interpretationContext(snapshot))
+  } catch {
+    // A throwing interpreter is a failure, never an execution.
+    return { kind: 'failed', message: explainFailure('unavailable') }
+  }
+
+  if (outcome.status !== 'proposed') {
+    return { kind: 'failed', message: explainFailure(outcome.reason) }
+  }
+
+  // NOTE: no risk is read from, derived from, or influenced by the proposal.
+  // `resolveProposal` returns a StructuredAction with no `risk` field; the level
+  // below is computed by `classifyRisk` alone.
+  const resolution = resolveProposal(outcome.proposal, snapshot)
+  if (!resolution.ok) {
+    return { kind: 'failed', message: explainFailure(resolution.reason) }
+  }
+  return { kind: 'action', action: resolution.action }
+}
+
+/** The honest response for an AI attempt that produced nothing runnable. */
+function aiClarification(message: string): CommandResponse {
+  return {
+    kind: 'clarification',
+    action: {
+      intent: 'CLARIFICATION',
+      target: '',
+      label: message,
+      description: AI_FALLBACK_HINT,
+    },
+  }
+}
+
 export async function executeCommand(
   input: string,
   deps: CommandPipelineDeps,
@@ -216,16 +300,28 @@ export async function executeCommand(
   deps.confirmation?.invalidate('superseded')
 
   const snapshot = await deps.registry.snapshot()
+
+  // ── Tier 1: deterministic. Always tried first, always wins if it recognises. ──
   const action = resolveCommand(raw, snapshot)
-  if (action.intent === 'CLARIFICATION') {
-    return { kind: 'clarification', action }
+  if (action.intent !== 'CLARIFICATION') {
+    // FOCUS_APPLICATION and every OS side effect go through the platform
+    // Launcher. SHOW_FAVORITIES / SHOW_RECENTS / OPEN_SETTINGS are answered from
+    // the existing config store (and the existing settings window) here, so typed
+    // and voice input share this exact same path.
+    return gateAndRun(action, deps, snapshot)
   }
 
-  // FOCUS_APPLICATION and every OS side effect go through the platform
-  // Launcher. SHOW_FAVORITES / SHOW_RECENTS / OPEN_SETTINGS are answered from
-  // the existing config store (and the existing settings window) here, so typed
-  // and voice input share this exact same path.
-  return gateAndRun(action, deps, snapshot)
+  // ── Tier 2: optional local AI. Unrecognised input only. ──────────────────
+  const interpreted = await interpretFallback(raw, deps, snapshot)
+  if (interpreted.kind === 'action') {
+    return gateAndRun(interpreted.action, deps, snapshot)
+  }
+  if (interpreted.kind === 'failed') {
+    return aiClarification(interpreted.message)
+  }
+
+  // No interpreter configured: the V03-S1..S4 clarification is returned verbatim.
+  return { kind: 'clarification', action }
 }
 
 /**

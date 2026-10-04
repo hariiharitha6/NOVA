@@ -12,6 +12,9 @@ import { registerIpcHandlers, broadcastConfig, broadcastConfirmationState } from
 import { executeCommand, createCommandPipelineDeps } from './core/command-pipeline'
 import { createConfirmationGate } from './core/confirmation'
 import type { ConfirmationGate } from './core/confirmation'
+import { createLocalCommandInterpreter } from './core/ai/interpreter'
+import { createOllamaClient } from './core/ai/ollama-client'
+import type { CommandInterpreter } from './core/ai/types'
 import { migrateShortcutDefaults } from './core/shortcut-policy'
 import { createTray } from './tray'
 import { createSherpaSpeechRecognizer } from './core/speech/sherpa-recognizer'
@@ -36,6 +39,16 @@ if (!gotTheLock) {
   let wake: ReturnType<typeof createWakeWordController> | null = null
   /** V03-S4 — the single confirmation gate, kept for shutdown teardown. */
   let confirmationGate: ConfirmationGate | null = null
+  /**
+   * V03-S5 — the OPTIONAL local AI interpreter, built LAZILY.
+   *
+   * Nothing AI-related happens during startup: the model client is not
+   * constructed, and no local service is contacted, until a command the
+   * deterministic engine did not recognise actually needs interpreting. While
+   * `aiInterpretationEnabled` is false the resolver returns null and no AI code
+   * runs at all.
+   */
+  let aiCache: { key: string; interpreter: CommandInterpreter } | null = null
 
   app.whenReady().then(() => {
     electronApp.setAppUserModelId('com.nova.desktop')
@@ -80,6 +93,37 @@ if (!gotTheLock) {
       },
     })
 
+    /**
+     * V03-S5 — resolve the local AI interpreter on demand.
+     *
+     * Lazy and self-invalidating: nothing is constructed at startup, the feature
+     * stays completely inert while disabled, and changing the provider URL, model
+     * or timeout in Settings rebuilds the client on next use. A misconfigured URL
+     * resolves to null (AI simply unavailable) rather than reaching the network.
+     */
+    const resolveInterpreter = (): CommandInterpreter | null => {
+      const cfg = configStore.get()
+      if (!cfg.aiInterpretationEnabled) {
+        aiCache = null
+        return null
+      }
+      const key = `${cfg.aiBaseUrl}|${cfg.aiModel}|${cfg.aiTimeoutMs}`
+      if (aiCache && aiCache.key === key) return aiCache.interpreter
+      try {
+        const interpreter = createLocalCommandInterpreter({
+          client: createOllamaClient({ baseUrl: cfg.aiBaseUrl, model: cfg.aiModel }),
+          timeoutMs: cfg.aiTimeoutMs,
+        })
+        aiCache = { key, interpreter }
+        return interpreter
+      } catch (error) {
+        // e.g. a non-loopback base URL. Report and stay deterministic.
+        console.warn(`[NOVA] Local AI unavailable: ${(error as Error).message}`)
+        aiCache = null
+        return null
+      }
+    }
+
     const hotkey = configStore.get().hotkey
     const hotkeyOk = registerHotkey(hotkey, windowManager)
     if (!hotkeyOk) {
@@ -107,6 +151,8 @@ if (!gotTheLock) {
             registry,
             launcher,
             confirmation: confirmationGate ?? undefined,
+            // SAME interpreter as the typed path: voice and typed cannot diverge.
+            interpreter: resolveInterpreter,
             onRecent: () => broadcastConfig(configStore),
             openSettings: () => windowManager?.showSettings(),
           }),
@@ -168,6 +214,7 @@ if (!gotTheLock) {
       voice: voiceInstance,
       wake,
       confirmation: confirmationGate,
+      interpreter: resolveInterpreter,
     })
     windowManager.init()
     tray = createTray(windowManager)

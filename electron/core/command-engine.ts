@@ -19,6 +19,45 @@ export type CommandSource = Omit<RegistrySnapshot, 'apps'> & { apps: AppEntry[] 
 
 const WEBSITE_PATTERN = /^https?:\/\//i
 
+/**
+ * The ONLY two origins NOVA will ever construct a search URL from. They are
+ * exported so the optional AI interpreter (v0.3 V03-S5) builds search URLs
+ * through this same code instead of duplicating the string — one place decides
+ * where a web search may go.
+ */
+export const GOOGLE_SEARCH_ORIGIN = 'https://www.google.com/search?q='
+export const YOUTUBE_SEARCH_ORIGIN = 'https://www.youtube.com/results?search_query='
+
+/**
+ * Build a search action from a raw query. The origin is constant and only the
+ * query varies, so the query is `encodeURIComponent`-escaped and can never be
+ * parsed as anything but data. Returns null for a blank query.
+ *
+ * Shared by the deterministic parser and the AI interpreter so the trusted
+ * origins cannot drift apart.
+ */
+export function buildSearchAction(
+  intent: 'SEARCH_WEB' | 'SEARCH_YOUTUBE',
+  rawQuery: string,
+): StructuredAction | null {
+  const query = rawQuery.trim()
+  if (!query) return null
+  if (intent === 'SEARCH_YOUTUBE') {
+    return {
+      intent: 'SEARCH_YOUTUBE',
+      target: `${YOUTUBE_SEARCH_ORIGIN}${encodeURIComponent(query)}`,
+      label: `Search YouTube for "${query}"`,
+      arguments: { query },
+    }
+  }
+  return {
+    intent: 'SEARCH_WEB',
+    target: `${GOOGLE_SEARCH_ORIGIN}${encodeURIComponent(query)}`,
+    label: `Search Google for "${query}"`,
+    arguments: { query },
+  }
+}
+
 function normalize(input: string): string {
   return input.trim().replace(/\s+/g, ' ').toLowerCase()
 }
@@ -81,19 +120,11 @@ export function resolveCommand(
       return clarification('Please provide a search query.')
     }
     if (/\b(?:youtube|yt)\b/i.test(raw) && !/^(search\s+(?:google|web))/i.test(raw)) {
-      return {
-        intent: 'SEARCH_YOUTUBE',
-        target: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
-        label: `Search YouTube for "${query}"`,
-        arguments: { query },
-      }
+      const action = buildSearchAction('SEARCH_YOUTUBE', query)
+      if (action) return action
     }
-    return {
-      intent: 'SEARCH_WEB',
-      target: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
-      label: `Search Google for "${query}"`,
-      arguments: { query },
-    }
+    const web = buildSearchAction('SEARCH_WEB', query)
+    if (web) return web
   }
 
   // Direct search patterns
@@ -103,13 +134,9 @@ export function resolveCommand(
       .replace(/^for\s+/i, '')
       .replace(/^for$/i, '')
       .trim()
-    if (!q) return clarification('Please provide a search query.')
-    return {
-      intent: 'SEARCH_YOUTUBE',
-      target: `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
-      label: `Search YouTube for "${q}"`,
-      arguments: { query: q },
-    }
+    const action = buildSearchAction('SEARCH_YOUTUBE', q)
+    if (action) return action
+    return clarification('Please provide a search query.')
   }
   if (raw.match(/^search\s+google\s+(.+)$/i) || raw.match(/^search\s+web\s+(.+)$/i)) {
     const q = raw
@@ -117,36 +144,24 @@ export function resolveCommand(
       .replace(/^for\s+/i, '')
       .replace(/^for$/i, '')
       .trim()
-    if (!q) return clarification('Please provide a search query.')
-    return {
-      intent: 'SEARCH_WEB',
-      target: `https://www.google.com/search?q=${encodeURIComponent(q)}`,
-      label: `Search Google for "${q}"`,
-      arguments: { query: q },
-    }
+    const action = buildSearchAction('SEARCH_WEB', q)
+    if (action) return action
+    return clarification('Please provide a search query.')
   }
 
   // Bare "google ..." or "youtube ..." search patterns
   if (raw.match(/^youtube\s+(.+)$/i) || raw.match(/^yt\s+(.+)$/i)) {
     const q = raw.replace(/^(youtube|yt)\s+/i, '').trim()
     if (q && q.match(/^(search|for|results)/i) === null) {
-      return {
-        intent: 'SEARCH_YOUTUBE',
-        target: `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
-        label: `Search YouTube for "${q}"`,
-        arguments: { query: q },
-      }
+      const action = buildSearchAction('SEARCH_YOUTUBE', q)
+      if (action) return action
     }
   }
   if (raw.match(/^google\s+(.+)$/i)) {
     const q = raw.replace(/^google\s+/i, '').trim()
     if (q && q.match(/^(search|for)/i) === null) {
-      return {
-        intent: 'SEARCH_WEB',
-        target: `https://www.google.com/search?q=${encodeURIComponent(q)}`,
-        label: `Search Google for "${q}"`,
-        arguments: { query: q },
-      }
+      const action = buildSearchAction('SEARCH_WEB', q)
+      if (action) return action
     }
   }
 
@@ -236,7 +251,18 @@ export function resolveCommand(
     }
 }
 
-function resolveTarget(name: string, registry: CommandSource): StructuredAction | null {
+/**
+ * Resolve a user-supplied NAME against the validated registry.
+ *
+ * This is the ONLY way any target becomes an executable path or a URL, and it is
+ * shared by the deterministic parser and the optional AI interpreter
+ * (v0.3 V03-S5). Exported so the AI path resolves a model-proposed name through
+ * exactly the same rules instead of re-implementing them.
+ *
+ * Returns null when the name matches nothing. A resolved target is ALWAYS a
+ * verbatim registry value — never text the user (or a model) supplied.
+ */
+export function resolveTarget(name: string, registry: CommandSource): StructuredAction | null {
   const q = name.trim()
   if (!q) return null
 

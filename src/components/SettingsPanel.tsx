@@ -12,6 +12,11 @@ import { acceleratorFromKeys, blockedAcceleratorReason, formatAccelerator } from
 import { DEFAULT_HOTKEY, DEFAULT_PTT_HOTKEY } from '../../electron/core/shortcut-policy'
 import { WAKE_PHRASE } from '../../electron/core/speech/constants'
 import { isValidWakePhrase } from '../../electron/core/speech/wake-phrase'
+import {
+  DEFAULT_LOCAL_AI_BASE_URL,
+  DEFAULT_LOCAL_AI_MODEL,
+} from '../../electron/core/ai/constants'
+import { isLoopbackHttpUrl } from '../../electron/core/ai/ollama-client'
 import { useWakeBridge } from '../hooks/useWakeBridge'
 import { useWakeStatus } from '../store/useWakeStore'
 import { NovaLogo } from './NovaLogo'
@@ -83,6 +88,10 @@ export function SettingsPanel() {
   const [webUrl, setWebUrl] = useState('')
   const [wakePhrase, setWakePhrase] = useState('')
   const [wakeError, setWakeError] = useState<string | null>(null)
+  const [aiBaseUrl, setAiBaseUrl] = useState('')
+  const [aiModel, setAiModel] = useState('')
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [aiLoaded, setAiLoaded] = useState(false)
   const statusTimer = useRef<number | null>(null)
   const wakeStatus = useWakeStatus()
   useWakeBridge()
@@ -105,6 +114,11 @@ export function SettingsPanel() {
       setRegistry(reg)
       setDisplays(disp)
       setStartup(st)
+      // Seed the AI inputs once, so the stored provider is shown rather than a
+      // blank field (without clobbering an in-progress edit on a later refresh).
+      setAiBaseUrl(cfg.aiBaseUrl)
+      setAiModel(cfg.aiModel)
+      setAiLoaded(true)
     }
     load().catch(() => {})
     const off = window.nova.onConfigChanged((c) => setConfig(c))
@@ -189,6 +203,32 @@ export function SettingsPanel() {
     const has = config.favorites.includes(id)
     const favorites = has ? config.favorites.filter((f) => f !== id) : [...config.favorites, id]
     void save({ favorites })
+  }
+
+  /**
+   * V03-S5 — save the local provider settings.
+   *
+   * The URL is validated here for an immediate, readable explanation, but the
+   * authoritative check is `sanitizeConfigPatch` in the main process: a
+   * non-loopback address is refused there too, so the renderer cannot widen what
+   * NOVA is allowed to contact.
+   */
+  const saveAiSettings = async (): Promise<void> => {
+    const url = aiBaseUrl.trim()
+    const model = aiModel.trim()
+    if (!url || !isLoopbackHttpUrl(url)) {
+      setAiError(
+        'Enter a local address on this machine, e.g. http://127.0.0.1:11434. Remote addresses are not supported.',
+      )
+      return
+    }
+    if (!model) {
+      setAiError('Enter the name of a model you have already installed locally.')
+      return
+    }
+    setAiError(null)
+    await save({ aiBaseUrl: url, aiModel: model })
+    toast('Local AI settings saved')
   }
 
   const addCustomApp = async (): Promise<void> => {
@@ -457,6 +497,92 @@ export function SettingsPanel() {
               </div>
               <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.55)', marginTop: 8 }}>
                 Audio is processed on this device. NOVA never stores recordings or uploads audio.
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Local AI interpretation">
+            <div className="glass-light" style={{ borderRadius: 14, padding: '14px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13, color: 'rgba(226,232,240,0.85)' }}>
+                  Interpret unrecognised commands
+                </span>
+                <Toggle
+                  checked={config.aiInterpretationEnabled}
+                  onChange={() => {
+                    // Turning the flag on/off is the only switch that matters; the
+                    // provider is not contacted until an unknown command arrives.
+                    void save({ aiInterpretationEnabled: !config.aiInterpretationEnabled })
+                  }}
+                />
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', marginTop: 8 }}>
+                Off by default. Known commands are always handled directly by NOVA and never
+                sent to a model. When this is off, nothing AI-related runs at all.
+              </div>
+
+              {config.aiInterpretationEnabled && (
+                <>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                    <input
+                      className="command-input"
+                      aria-label="Local AI service URL"
+                      style={{
+                        fontSize: 13,
+                        padding: '8px 12px',
+                        background: 'rgba(255,255,255,0.05)',
+                        borderRadius: 10,
+                        flex: '1 1 200px',
+                      }}
+                      placeholder={DEFAULT_LOCAL_AI_BASE_URL}
+                      value={aiLoaded ? aiBaseUrl : config.aiBaseUrl}
+                      onChange={(e) => setAiBaseUrl(e.target.value)}
+                    />
+                    <input
+                      className="command-input"
+                      aria-label="Local AI model name"
+                      style={{
+                        fontSize: 13,
+                        padding: '8px 12px',
+                        background: 'rgba(255,255,255,0.05)',
+                        borderRadius: 10,
+                        flex: '1 1 160px',
+                      }}
+                      placeholder={DEFAULT_LOCAL_AI_MODEL}
+                      value={aiLoaded ? aiModel : config.aiModel}
+                      onChange={(e) => setAiModel(e.target.value)}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                    <button
+                      className="quick-action-btn"
+                      style={{ minWidth: 0, padding: '8px 14px', borderRadius: 999 }}
+                      onClick={saveAiSettings}
+                    >
+                      Save AI settings
+                    </button>
+                    <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', alignSelf: 'center' }}>
+                      Timeout {Math.round(config.aiTimeoutMs / 1000)}s
+                    </span>
+                  </div>
+                  {aiError && (
+                    <div style={{ fontSize: 12, color: 'rgba(248,113,113,0.85)', marginTop: 6 }}>
+                      {aiError}
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', marginTop: 10 }}>
+                Local only: the address must be this machine (127.0.0.1 or localhost). Remote
+                addresses are rejected, and there is no cloud fallback.
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.55)', marginTop: 8 }}>
+                Command text is sent only to your local service, which NOVA never downloads or
+                starts for you. NOVA still decides what runs: the model can only suggest a name,
+                which is resolved from your apps and websites, then classified and confirmed as
+                usual. If the service is missing or slow, NOVA falls back to asking for
+                clarification.
               </div>
             </div>
           </Section>

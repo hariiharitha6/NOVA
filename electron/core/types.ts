@@ -2,6 +2,11 @@
 
 import { DEFAULT_HOTKEY, DEFAULT_PTT_HOTKEY } from './shortcut-policy'
 import { DEFAULT_WAKE_PHRASE } from './speech/constants'
+import {
+  AI_INTERPRETATION_TIMEOUT_MS,
+  DEFAULT_LOCAL_AI_BASE_URL,
+  DEFAULT_LOCAL_AI_MODEL,
+} from './ai/constants'
 
 export type Intent =
   | 'OPEN_APPLICATION'
@@ -130,6 +135,30 @@ export interface NovaConfig {
    * user choices.
    */
   shortcutsMigratedV2: boolean
+  /**
+   * v0.3 Slice 5 — OPTIONAL local AI interpretation for commands the
+   * deterministic engine did not recognise. OFF by default.
+   *
+   * While false NOVA never constructs a local model client, never contacts a
+   * local AI service, and behaves exactly as it did before this slice. Turning
+   * this on does NOT enable any cloud, remote, or telemetry behaviour: the
+   * provider is structurally restricted to loopback addresses.
+   */
+  aiInterpretationEnabled: boolean
+  /**
+   * v0.3 Slice 5 — base URL of the LOCAL AI runtime. Must be a loopback
+   * address; `sanitizeConfigPatch` rejects anything else, so command text can
+   * never be sent to a remote host. Ignored while `aiInterpretationEnabled`
+   * is false.
+   */
+  aiBaseUrl: string
+  /**
+   * v0.3 Slice 5 — name of the LOCAL model to ask (e.g. an Ollama model tag).
+   * NOVA never downloads it and never requires it to exist.
+   */
+  aiModel: string
+  /** v0.3 Slice 5 — per-request ceiling for local interpretation (ms). */
+  aiTimeoutMs: number
 }
 
 export interface LaunchResult {
@@ -244,5 +273,11 @@ export function defaultConfig(): NovaConfig {
     wakeWordEnabled: false,
     wakeWord: DEFAULT_WAKE_PHRASE,
     shortcutsMigratedV2: false,
+    // v0.3 Slice 5 — the AI layer is optional and OFF by default. No local
+    // model client is created and no AI code path runs until the user opts in.
+    aiInterpretationEnabled: false,
+    aiBaseUrl: DEFAULT_LOCAL_AI_BASE_URL,
+    aiModel: DEFAULT_LOCAL_AI_MODEL,
+    aiTimeoutMs: AI_INTERPRETATION_TIMEOUT_MS,
   }
 }

@@ -5,6 +5,8 @@ import { dirname } from 'node:path'
 import { defaultConfig, type ConfigStore, type NovaConfig, type RecentItem } from './types'
 import { normalizeWakePhrase } from './speech/wake-phrase'
 import { DEFAULT_WAKE_PHRASE } from './speech/constants'
+import { assertLoopbackUrl, assertModelName } from './ai/ollama-client'
+import { AI_MAX_TIMEOUT_MS, AI_MIN_TIMEOUT_MS } from './ai/constants'
 
 const CONFIG_VERSION = 1
 
@@ -105,6 +107,36 @@ export function sanitizeConfigPatch(patch: Record<string, unknown>): Partial<Nov
     ) {
       out.position = { displayId: pos['displayId'], x: pos['x'], y: pos['y'] }
     }
+  }
+  // ─── v0.3 Slice 5 — optional local AI interpretation ────────────────────────
+  // Conservative by construction: the flag defaults to false, and the base URL is
+  // accepted ONLY if it is a loopback address. A renderer (or anything else) that
+  // tries to point NOVA at a remote host has its patch silently reduced to
+  // "flag off", so no command text can ever leave the machine.
+  if (typeof patch['aiInterpretationEnabled'] === 'boolean') {
+    out.aiInterpretationEnabled = patch['aiInterpretationEnabled']
+  }
+  if (typeof patch['aiBaseUrl'] === 'string' && patch['aiBaseUrl'].length <= 200) {
+    try {
+      out.aiBaseUrl = assertLoopbackUrl(patch['aiBaseUrl']).origin
+    } catch {
+      // Not a loopback URL: dropped from the patch, leaving the default.
+    }
+  }
+  if (typeof patch['aiModel'] === 'string' && patch['aiModel'].length <= 64) {
+    try {
+      out.aiModel = assertModelName(patch['aiModel'])
+    } catch {
+      // Invalid model name: dropped from the patch, leaving the default.
+    }
+  }
+  if (
+    typeof patch['aiTimeoutMs'] === 'number' &&
+    Number.isFinite(patch['aiTimeoutMs']) &&
+    patch['aiTimeoutMs'] >= AI_MIN_TIMEOUT_MS &&
+    patch['aiTimeoutMs'] <= AI_MAX_TIMEOUT_MS
+  ) {
+    out.aiTimeoutMs = Math.round(patch['aiTimeoutMs'])
   }
   return out
 }

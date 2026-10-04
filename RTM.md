@@ -279,8 +279,8 @@ by typed and voice commands. No new parser and no separate voice path were added
   `windows-launcher.ts` `openUrl()` path (http(s) only) alongside `OPEN_WEBSITE`.
 - **EMPTY QUERY = CLARIFICATION.** Blank queries never launch a search.
 - **V03-S3 (focus + rich launcher actions) is now Completed** — see below.
-  **V03-S4 (risk/confirmation enforcement), V03-S5 (AI interpretation) and
-  later slices are NOT started and remain Planned.**
+  **V03-S4 (risk/confirmation enforcement) and V03-S5 (optional local-AI
+  interpretation) are now Completed** — see below. Later slices remain Planned.
 
 | Requirement ID | Version | Epic | Requirement | Acceptance Criteria | Priority | Dependencies | Platform | Status |
 |---|---|---|---|---|---|---|---|---|
@@ -343,7 +343,8 @@ implementation.
   competing result interface; it is purely additive, so v0.2 consumers that
   ignore `data` are unaffected.
 - **V03-S4 (risk/confirmation enforcement) is now Completed** — see below.
-  **V03-S5 (AI interpretation) and automation remain Planned.**
+  **V03-S5 (optional local-AI interpretation) is now Completed** — see below.
+  v0.3 automation remains Planned.
 
 | Requirement ID | Version | Epic | Requirement | Acceptance Criteria | Priority | Dependencies | Platform | Status |
 |---|---|---|---|---|---|---|---|---|
@@ -392,9 +393,9 @@ by a model.
 - **RISK IS NOT DECIDED BY THE PARSER.** `command-engine.ts` no longer stamps
   `risk: 'LOW'` on every action. `electron/core/risk-policy.ts` is the single
   source of truth and classifies every action immediately before the gate. This
-  matters for V03-S5: when optional AI interpretation is added, an interpreted
-  proposal cannot mark itself safe, because the interpreter has no way to
-  contribute a risk level at all.
+  matters for V03-S5 (now Completed, see below): an interpreted proposal cannot
+  mark itself safe, because the interpreter has no way to contribute a risk level
+  at all.
 - **ONE BOUNDARY, BOTH INPUT PATHS.** The enforced order is
   `input → intent → StructuredCommand → risk classification → validation →
   confirmation if MEDIUM/HIGH → execution`. Typed IPC and voice both call the same
@@ -493,6 +494,81 @@ recognizer.
 
 ---
 
+## v0.3 Slice 5 - Optional Local AI Interpretation (V03-S5)
+
+V03-S5 adds an **optional, local-only** AI interpreter. It is a *fallback* for
+commands the deterministic engine did not recognise, and it is **off by default**.
+It never executes anything: it may only name an intent and a target, which NOVA
+then resolves, classifies, gates and runs through the existing V03-S4 path.
+
+```
+input -> deterministic engine --recognised--> existing path (unchanged, no AI)
+      --unrecognised--> local AI -> CommandProposal -> validateProposal
+                     -> resolveProposal (registry) -> classifyRisk
+                     -> confirmation gate -> existing launcher
+```
+
+The AI layer lives in `electron/core/ai/` and imports no launcher, no confirmation
+gate, no risk policy, no Electron, no IPC, and no process or filesystem module.
+
+| ID | Ver | Area | Requirement | Evidence | Pri | Depends | Platform | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| V03-S5-001 | v0.3 | Architecture | Provider abstraction, local only | `electron/core/ai/types.ts` defines `CommandInterpreter` (`interpret(input, context)`) and `electron/core/ai/ollama-client.ts` defines `LocalModelClient` (`complete(messages, signal)`). The pipeline depends only on the interpreter interface; `command-pipeline.ts` contains no provider name, hostname or port (asserted by test). | High | V03-S1 | Cross-platform | Completed |
+| V03-S5-002 | v0.3 | Architecture | The AI is an interpreter, never an executor | `interpretFallback()` in `command-pipeline.ts` receives only text plus a name-only context and can return only an `InterpretOutcome`. The interpreter is never passed the `Launcher`, the `ConfirmationGate`, IPC, Electron or a filesystem handle, and a throwing interpreter becomes a clarification, not an execution. | High | V03-S5-001 | Cross-platform | Completed |
+| V03-S5-003 | v0.3 | Architecture | Deterministic first; AI only as fallback | `executeCommand()` consults the interpreter **only** when `resolveCommand()` returned `CLARIFICATION`. Tests assert the model is never called for `open chrome` or `open settings`, even when it is rigged to answer with a different intent, and that an empty/oversized command is rejected before any interpretation. | High | V03-S5-001 | Cross-platform | Completed |
+| V03-S5-004 | v0.3 | Security | Structured proposal over existing types | `CommandProposal` is `{ intent, target, arguments?, confidence? }`. `AI_ALLOWED_INTENTS` is built from the existing `Intent` union and limited to `OPEN_APPLICATION`, `FOCUS_APPLICATION`, `OPEN_WEBSITE`, `OPEN_FILE`, `OPEN_FOLDER`, `SEARCH_WEB`, `SEARCH_YOUTUBE`. `OPEN_SETTINGS`, `SHOW_FAVORITES`, `SHOW_RECENTS`, `CLARIFICATION` and `UNKNOWN` are refused, as is any invented intent. | High | V03-S1 | Cross-platform | Completed |
+| V03-S5-005 | v0.3 | Security | Strict validator rejects unknown fields | `validateProposal()` accepts only the keys `intent`, `target`, `arguments`, `confidence` and only `arguments.query`. Any other field — `risk`, `path`, `url`, `executable`, `shellCommand`, `args`, `requiresConfirmation` — is **rejected, not ignored**, because a model volunteering them is signalling an attempt to steer execution. | High | V03-S5-004 | Cross-platform | Completed |
+| V03-S5-006 | v0.3 | Security | AI risk is impossible | `risk` is not an accepted key, so a model cannot supply, raise or lower a level. `resolveProposal()` returns a `StructuredAction` with `risk` unset, and `risk-policy.ts` classifies it alone. A `confidence: 1` proposal for an unvetted origin is still `MEDIUM` and still gated (asserted). | High | V03-S4-001 | Cross-platform | Completed |
+| V03-S5-007 | v0.3 | Security | No shell text, path or protocol in a machine target | Machine-name targets are refused for shell metacharacters (`| & ; > < \` $ % " '`), control characters, embedded newlines, executable/script extensions (`.exe .bat .cmd .ps1 .js .vbs .dll ...`), Windows paths and drive letters, `..` traversal, and a token denylist (`cmd`, `powershell`, `bash`, `shell`, `exec`, `spawn`, ...). A URL scheme is accepted only for `OPEN_WEBSITE`, and only `http`/`https`. | High | V03-S5-005 | Cross-platform | Completed |
+| V03-S5-008 | v0.3 | Security | Registry decides every executable path and URL | `resolveProposal()` returns a verbatim registry value: an app/folder/file target must resolve through `resolveTarget()` / the validated `fileFolders` list, and a proposed intent that contradicts the registry (a folder asked for as a file, an app asked for as a site) is refused rather than coerced. Model text never becomes a path. | High | V03-S5-007 | Cross-platform | Completed |
+| V03-S5-009 | v0.3 | Security | Search queries stay data on trusted origins | `SEARCH_WEB`/`SEARCH_YOUTUBE` reuse the single exported `buildSearchAction()` from `command-engine.ts`, so `GOOGLE_SEARCH_ORIGIN` and `YOUTUBE_SEARCH_ORIGIN` remain the only origins and the query is `encodeURIComponent`-escaped. Shell-like words are permitted **in a query** ("how to use powershell") because they are provably data; a test asserts `rm -rf safely && echo hi` stays inside the fixed origin. | High | V03-S2-003 | Cross-platform | Completed |
+| V03-S5-010 | v0.3 | Security | Loopback-only provider | `assertLoopbackUrl()` accepts only `127.0.0.1`, `localhost`, `::1`/`[::1]` over http(s) and throws otherwise — including `127.0.0.1.evil.com`, `0.0.0.0`, LAN addresses and remote hosts. `createOllamaClient()` cannot be constructed for a remote base URL, and `sanitizeConfigPatch()` drops a non-loopback URL from stored config, so there is no code path that sends command text off the machine. | High | V03-S5-001 | Cross-platform | Completed |
+| V03-S5-011 | v0.3 | Privacy | No auth, no telemetry, no cloud | The request carries only `content-type`; tests assert the headers contain no `auth`/`bearer`/`token`. The body is the model name, the two messages, `stream: false` and `temperature: 0`. There is no cloud provider, no API key and no analytics anywhere in the slice. | High | V03-S5-010 | Cross-platform | Completed |
+| V03-S5-012 | v0.3 | Privacy | Name-only context is all the model ever sees | `interpretationContext()` builds the only `InterpretationContext` shape and emits names and aliases only — never `AppEntry.path`, a website URL or a file path. Tests assert the serialised context contains no `chrome.exe`, no `https://` and no backslash. | High | V03-S5-004 | Cross-platform | Completed |
+| V03-S5-013 | v0.3 | Quality | Constrained prompt, robust parsing | `INTERPRETER_SYSTEM_PROMPT` is a selector, not a persona: it states the model has no capabilities, lists the only allowed keys, forbids paths/URLs/shell/protocols and the keys `risk`/`url`/`executablePath`/`shellCommand`/`executor`/`code`, and instructs `{"intent":"UNKNOWN",...}` when unsure. `extractJsonObject()` recovers the first balanced `{...}` run from prose or a code fence without being confused by braces or escaped quotes inside strings. | High | V03-S5-004 | Cross-platform | Completed |
+| V03-S5-014 | v0.3 | Robustness | Bounded, cancellable request | `AI_INTERPRETATION_TIMEOUT_MS = 8000`, clamped to 1000–30000ms by the interpreter and re-validated in config. One `AbortController` per attempt is cleared in `finally`, so a settled request leaves no timer behind; a provider that never answers is aborted and becomes a clarification (fake-timer test). An already-aborted call issues no request at all. | High | V03-S5-001 | Cross-platform | Completed |
+| V03-S5-015 | v0.3 | Robustness | Every failure degrades to clarification | Unavailable service, transport error, non-2xx, unreadable response, non-JSON prose, `UNKNOWN`, a disallowed intent, an unresolvable name, a rejected field and a below-threshold confidence all return a `clarification` with a readable message and a fallback hint, and launch nothing. A throwing interpreter is treated as unavailable. | High | V03-S5-014 | Cross-platform | Completed |
+| V03-S5-016 | v0.3 | Quality | Confidence is metadata only | `AI_MIN_CONFIDENCE = 0.6`. A present confidence must be finite and within `[0,1]` (enforced in both `validateProposal()` and `checkConfidence()`); below the threshold the proposal is refused. **Absence** is allowed and is not a hole — the proposal still faces the strict schema, the allowlist, registry resolution, `classifyRisk` and the gate. Confidence never affects a risk level. | High | V03-S5-006 | Cross-platform | Completed |
+| V03-S5-017 | v0.3 | Architecture | Interpreted commands re-enter the V03-S4 path | `interpretFallback()` hands the resolved action to the same `gateAndRun()` as a deterministic command. An interpreted app launch is `MEDIUM` and confirmed; an unvetted origin is confirmed with the origin shown; confirming runs exactly the prompted action and cancelling runs nothing; the model is not re-run for the confirmation. | High | V03-S4-010 | Cross-platform | Completed |
+| V03-S5-018 | v0.3 | Architecture | Typed and voice parity | `IpcDeps.interpreter` and the voice path in `main.ts` are given the **same** `resolveInterpreter` resolver, so an interpreted command behaves identically from either surface. Tests assert identical kind, intent and prompt, and that confirming the spoken prompt launches the same action. | High | V03-S5-017 | Cross-platform | Completed |
+| V03-S5-019 | v0.3 | Config | Optional and off by default | `NovaConfig` gains `aiInterpretationEnabled` (default `false`), `aiBaseUrl` (default `http://127.0.0.1:11434`), `aiModel` (default `llama3.2`) and `aiTimeoutMs` (default `8000`). `sanitizeConfigPatch()` validates each: a non-loopback URL and an unusable model name are dropped from the patch rather than stored, the timeout must be within 1000–30000, and a URL alone never switches the feature on. | High | V03-S5-010 | Cross-platform | Completed |
+| V03-S5-020 | v0.3 | Architecture | Lazy provider construction | `main.ts` holds a `resolveInterpreter()` closure and an `aiCache` keyed by `baseUrl|model|timeoutMs`. Nothing is constructed during startup; while the feature is disabled the resolver returns `null` and no AI code runs; changing the provider settings rebuilds the client on next use; a misconfigured URL resolves to `null` (deterministic behaviour) instead of reaching the network. | High | V03-S5-019 | Cross-platform | Completed |
+| V03-S5-021 | v0.3 | UI | Explicit consent and privacy wording | Settings gains one "Local AI interpretation" section: a toggle (default off), the loopback URL and model fields, a save action with a readable error for a remote address, the effective timeout, and plain statements that known commands never reach a model, that the address must be this machine with no cloud fallback, that command text goes only to the user's own local service which NOVA never downloads or starts, and that NOVA still decides what runs. Existing layout, styling and the V03-S4 confirmation dialog are untouched. | High | V03-S5-019 | Cross-platform | Completed |
+| V03-S5-022 | v0.3 | Security | No new execution capability | Comment- and string-stripped source assertions over all seven `electron/core/ai/*.ts` files prove the absence of `child_process`, `execSync`, `spawn`, `BrowserWindow`, `ipcRenderer`/`ipcMain`, `require()`, `node:fs`, `writeFile`/`unlink`/`shell.`, and of any `electron` reference; that no file imports `launcher`, `confirmation` or `risk-policy`; and that the only permitted imports are `command-engine`, core `types` and the AI layer's own modules. `windows-launcher.ts` and `risk-policy.ts` are unmodified. | High | All V03-S5 | Cross-platform | Completed |
+| V03-S5-023 | v0.3 | Quality | V03-S5 automated tests | `tests/v03-local-ai.test.ts` (87 tests) covers the provider seam, deterministic-first behaviour, schema and allowlist enforcement, field/shell/path/protocol rejection, confidence handling, deterministic resolution and origin safety, the full pipeline with the gate, every failure mode, loopback enforcement, request shape, prompt/parsing, config sanitisation and the architectural boundary. No GUI, no network, no Ollama, no model weights and no microphone required — every provider is an injected stub or an injected `fetch`. | High | All V03-S5 | Cross-platform | Completed |
+| V03-S5-024 | v0.3 | Quality | Clean TypeScript/build + regression | `npx tsc --noEmit` exits 0, `npm run build` succeeds, and all pre-existing v0.1/v0.2/V03-S1..S4 tests continue to pass unchanged (428/428 total after V03-S5, including the new suite). | High | All V03-S5 | Cross-platform | Completed |
+
+**Executability:** All 24 requirements are backed by executable code and 87 new
+automated tests. The safety properties are asserted directly rather than described:
+the model is provably not consulted for a recognised command, provably cannot
+supply a risk level or a path, and provably has no import path to any capability
+that could execute something.
+
+**Risks:** A prompt-injected or simply confused local model can still suggest a
+legitimate-looking action; the consequence is a confirmation prompt the user sees
+and must approve, never a silent execution. Latency is added only to commands NOVA
+could not previously recognise, bounded at 8 seconds. `validateProposal()` is
+deliberately unforgiving, so a verbose local model may be refused where a
+deterministic parser would have succeeded — the failure mode is a clarification,
+not a wrong action.
+
+**Dependencies:** V03-S1 (`Intent`/`StructuredAction`), V03-S2 (the fixed search
+origins now shared with the AI path), V03-S4 (`classifyRisk` and the confirmation
+gate). No new runtime dependency, no model weights and no native binding were added;
+the provider uses the global `fetch` already available in the main process.
+
+**Known limitations (honest):** Interpretation quality depends entirely on whichever
+local model the user has installed; NOVA neither downloads nor benchmarks one, and
+a weak model will produce more clarifications. Only the seven allowlisted intents
+are reachable, so `open settings`-style commands stay purely deterministic.
+Real end-to-end behaviour against a running Ollama instance has **not** been
+exercised — the provider is covered by injected `fetch` only, and manual testing
+against a live local model remains **Testing — awaiting human verification**. There
+is no reordering or conversational context: each unknown command is interpreted in
+isolation. No cloud provider exists, and none is planned for this slice.
+
+---
+
 ## Legend
 
 - **V01-S1-*** — v0.1 Slice 1 (desktop core). Manually validated by the user.
@@ -548,5 +624,12 @@ recognizer.
   a fixed spoken yes/no vocabulary active only while a prompt is pending.
   Manual spoken/microphone acceptance of the confirmation flow remains
   **Testing — awaiting human verification**.
-- **V03-S5** (optional local-AI interpretation) and v0.3 automation are **not
-  started** and remain Planned.
+- **V03-S5** (optional local-AI interpretation) is **Completed**. Implemented as a
+  deterministic fallback only, off by default, provider-neutral and structurally
+  restricted to loopback: a recognised command never reaches a model, a model may
+  only propose an intent plus a name, every proposal passes a strict validator and
+  the validated registry before the existing risk policy and confirmation gate see
+  it, and NOVA never downloads a model. Automated checks are clean and mock-only;
+  real end-to-end behaviour against a running local model remains **Testing —
+  awaiting human verification**.
+- **v0.3 automation** is **not started** and remains Planned.
