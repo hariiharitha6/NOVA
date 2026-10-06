@@ -187,6 +187,7 @@ function buildIco(sizes) {
   const rasters = sizes.map((s) => ({ s, png: s > 64, rgba: rasterize(s) }))
   const header = Buffer.alloc(6)
   header.writeUInt16LE(0, 0)
+  header.writeUInt16LE(1, 2)
   header.writeUInt16LE(rasters.length, 4)
   let offset = 6 + rasters.length * 16
   const entries = []
