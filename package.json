@@ -1,6 +1,6 @@
 {
   "name": "nova-desktop",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "NOVA — desktop command launcher",
   "main": "out/main/index.js",
   "homepage": ".",
