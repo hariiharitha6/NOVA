@@ -85,6 +85,15 @@ export function CommandOverlay() {
         .getRegistry()
         .then(applyRegistry)
         .catch(() => {})
+      // v0.3 Bugs 3/4: a voice list result (favorites/recents) is delivered as
+      // a broadcast, which a window that was still loading would have missed.
+      // Replayed exactly once here; expiry in main keeps it from going stale.
+      window.nova
+        .getLastVoiceListResult()
+        .then((response) => {
+          if (response) applyResponse(response, setConfirmation, setFeedback, setInput)
+        })
+        .catch(() => {})
     }, [resetSession, focusInput]),
   )
 
@@ -107,10 +116,17 @@ export function CommandOverlay() {
     // V03-S4: the prompt may be answered from any surface (overlay buttons,
     // spoken yes/no, timeout), so the overlay follows the main process.
     const offConfirmation = window.nova.onConfirmationState(setConfirmation)
+    // v0.3 Bugs 3/4: voice responses never pass through runCommand(), so they
+    // arrive as a broadcast. Rendering them here makes a spoken "Show
+    // favorites" / "Show recents" appear exactly like the typed command.
+    const offCommandResult = window.nova.onCommandResult((response) => {
+      applyResponse(response, setConfirmation, setFeedback, setInput)
+    })
     return () => {
       offConfig()
       offRegistry()
       offConfirmation()
+      offCommandResult()
     }
   }, [focusInput])
 
@@ -264,7 +280,7 @@ export function CommandOverlay() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <NovaLogo size={18} variant="gradient" decorative />
-              <span style={{ color: 'var(--nova-royal, #a855f7)', fontWeight: 600, fontSize: 13, letterSpacing: '0.08em' }}>
+              <span style={{ color: 'var(--nova-royal, #C23036)', fontWeight: 600, fontSize: 13, letterSpacing: '0.08em' }}>
                 NOVA
               </span>
               <span style={{ color: 'rgba(148,163,184,0.6)', fontSize: 12 }}>{formatAccelerator(hotkey)} to toggle</span>

@@ -63,11 +63,11 @@ function TerminalModule() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 10 }}>
       {/* Status Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#38bdf8' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#8F97A2' }}>
           <span style={{ animation: 'pulse 1.5s infinite' }}>●</span>
           <span>Interactive Neural Shell</span>
         </div>
-        <div style={{ fontSize: 10, color: '#64748b', fontFamily: 'monospace' }}>
+        <div style={{ fontSize: 10, color: '#7C838D', fontFamily: 'monospace' }}>
           PID: 14890 | RAM: 142MB | TTY: /dev/pts/1
         </div>
       </div>
@@ -75,7 +75,7 @@ function TerminalModule() {
       {/* Terminal Output */}
       <div ref={scrollRef} style={{ flex: 1, background: 'rgba(5, 7, 18, 0.85)', borderRadius: 12, border: '1px solid rgba(56,189,248,0.2)', padding: 14, fontFamily: '"JetBrains Mono", monospace', fontSize: 12, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
         {lines.map(l => (
-          <div key={l.id} style={{ color: l.type === 'cmd' ? '#38bdf8' : l.type === 'ai' ? '#c4b5fd' : '#94a3b8', lineHeight: 1.5 }}>
+          <div key={l.id} style={{ color: l.type === 'cmd' ? '#8F97A2' : l.type === 'ai' ? '#EDE5D2' : '#9BA3AC', lineHeight: 1.5 }}>
             {l.text}
           </div>
         ))}
@@ -83,7 +83,7 @@ function TerminalModule() {
 
       {/* Terminal Prompt Input */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'rgba(15,23,42,0.8)', padding: '6px 12px', borderRadius: 12, border: '1px solid rgba(56,189,248,0.3)' }}>
-        <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>❯</span>
+        <span style={{ color: '#8F97A2', fontWeight: 'bold' }}>❯</span>
         <input
           value={inputCmd}
           onChange={e => setInputCmd(e.target.value)}
@@ -123,11 +123,11 @@ function ConversationModule() {
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, paddingRight: 6 }}>
         {messages.map(m => (
           <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: m.sender === 'user' ? 'flex-end' : 'flex-start' }}>
-            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: m.sender === 'user' ? '#a78bfa' : '#38bdf8' }}>
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: m.sender === 'user' ? '#E1D6BE' : '#8F97A2' }}>
               {m.sender === 'user' ? 'ENGINEER' : 'AI ORCHESTRATOR'}
             </span>
             {m.thought && (
-              <div style={{ fontSize: 11, fontStyle: 'italic', background: 'rgba(167,139,250,0.1)', color: '#c4b5fd', padding: '6px 10px', borderRadius: 8, borderLeft: '2px solid #a78bfa', maxWidth: '85%' }}>
+              <div style={{ fontSize: 11, fontStyle: 'italic', background: 'rgba(233,224,207,0.10)', color: '#EDE5D2', padding: '6px 10px', borderRadius: 8, borderLeft: '2px solid #E1D6BE', maxWidth: '85%' }}>
                 💭 {m.thought}
               </div>
             )}
@@ -146,7 +146,7 @@ function ConversationModule() {
           placeholder="Direct the AI agent..."
           style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#f8fafc', fontSize: 12 }}
         />
-        <button onClick={handleSend} style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>
+        <button onClick={handleSend} style={{ background: 'linear-gradient(135deg, #B92D32, #B92D32)', color: 'white', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>
           Send
         </button>
       </div>
@@ -199,7 +199,7 @@ impl NeuralCache {
     <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 12, height: '100%' }}>
       {/* File Tree List */}
       <div style={{ background: 'rgba(15,23,42,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '0.1em', marginBottom: 4 }}>PROJECT FILES</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#7C838D', letterSpacing: '0.1em', marginBottom: 4 }}>PROJECT FILES</div>
         {files.map(f => (
           <button
             key={f.name}
@@ -208,12 +208,12 @@ impl NeuralCache {
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               padding: '8px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
               background: selectedFile === f.name ? 'rgba(99,102,241,0.2)' : 'transparent',
-              color: selectedFile === f.name ? '#c4b5fd' : '#94a3b8',
+              color: selectedFile === f.name ? '#EDE5D2' : '#9BA3AC',
               fontSize: 12, textAlign: 'left',
             }}
           >
             <span>📄 {f.name}</span>
-            <span style={{ fontSize: 9, color: f.status === 'modified' ? '#f59e0b' : f.status === 'added' ? '#10b981' : '#64748b' }}>{f.diff}</span>
+            <span style={{ fontSize: 9, color: f.status === 'modified' ? '#f59e0b' : f.status === 'added' ? '#10b981' : '#7C838D' }}>{f.diff}</span>
           </button>
         ))}
       </div>
@@ -237,19 +237,19 @@ function ResearchModule() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%', overflowY: 'auto' }}>
       <div style={{ padding: '12px 16px', background: 'rgba(139,92,246,0.1)', borderRadius: 12, border: '1px solid rgba(139,92,246,0.25)' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', marginBottom: 4 }}>SYNTHESIS RESULT</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#E1D6BE', marginBottom: 4 }}>SYNTHESIS RESULT</div>
         <div style={{ fontSize: 12, color: '#e2e8f0', lineHeight: 1.5 }}>
           High-performance Electron transparent overlays require disabling DWM frame margins and enabling hardware acceleration with custom native window bounds calculations.
         </div>
       </div>
 
-      <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '0.1em' }}>CITATIONS & SOURCES</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#7C838D', letterSpacing: '0.1em' }}>CITATIONS & SOURCES</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {sources.map((s, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(15,23,42,0.6)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
             <div>
               <div style={{ fontSize: 12, color: '#cbd5e1', fontWeight: 600 }}>{s.title}</div>
-              <div style={{ fontSize: 10, color: '#64748b' }}>{s.domain}</div>
+              <div style={{ fontSize: 10, color: '#7C838D' }}>{s.domain}</div>
             </div>
             <span style={{ fontSize: 10, fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.15)', padding: '2px 8px', borderRadius: 6 }}>
               {s.relevance}
@@ -283,10 +283,10 @@ function TasksModule() {
       <div style={{ padding: 12, background: 'rgba(15,23,42,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#cbd5e1', marginBottom: 6 }}>
           <span>Agent Execution Pipeline</span>
-          <span style={{ color: '#a78bfa', fontWeight: 'bold' }}>{Math.round((completed / tasks.length) * 100)}%</span>
+          <span style={{ color: '#E1D6BE', fontWeight: 'bold' }}>{Math.round((completed / tasks.length) * 100)}%</span>
         </div>
         <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${(completed / tasks.length) * 100}%`, background: 'linear-gradient(90deg, #6366f1, #a78bfa)', transition: 'width 0.3s ease' }} />
+          <div style={{ height: '100%', width: `${(completed / tasks.length) * 100}%`, background: 'linear-gradient(90deg, #B92D32, #E1D6BE)', transition: 'width 0.3s ease' }} />
         </div>
       </div>
 
@@ -303,10 +303,10 @@ function TasksModule() {
               cursor: 'pointer',
             }}
           >
-            <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${t.done ? '#10b981' : '#64748b'}`, background: t.done ? '#10b981' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'white' }}>
+            <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${t.done ? '#10b981' : '#7C838D'}`, background: t.done ? '#10b981' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'white' }}>
               {t.done ? '✓' : ''}
             </div>
-            <span style={{ fontSize: 12, color: t.done ? '#94a3b8' : '#e2e8f0', textDecoration: t.done ? 'line-through' : 'none' }}>
+            <span style={{ fontSize: 12, color: t.done ? '#9BA3AC' : '#e2e8f0', textDecoration: t.done ? 'line-through' : 'none' }}>
               {t.text}
             </span>
           </div>
@@ -327,18 +327,18 @@ function TimelineModule() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%', paddingRight: 6 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '0.1em' }}>REVISION HISTORY & TIME SCRUBBER</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#7C838D', letterSpacing: '0.1em' }}>REVISION HISTORY & TIME SCRUBBER</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, position: 'relative' }}>
         <div style={{ position: 'absolute', left: 15, top: 10, bottom: 10, width: 2, background: 'rgba(139,92,246,0.3)' }} />
         {checkpoints.map((cp, idx) => (
           <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 16, position: 'relative', zIndex: 1 }}>
-            <div style={{ width: 12, height: 12, borderRadius: '50%', background: cp.hash === 'HEAD' ? '#a78bfa' : '#334155', border: '2px solid #0f172a', boxShadow: cp.hash === 'HEAD' ? '0 0 10px #a78bfa' : 'none' }} />
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: cp.hash === 'HEAD' ? '#E1D6BE' : '#2E333A', border: '2px solid #14171C', boxShadow: cp.hash === 'HEAD' ? '0 0 10px #E1D6BE' : 'none' }} />
             <div style={{ flex: 1, padding: '10px 14px', background: 'rgba(15,23,42,0.6)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: 12, color: '#e2e8f0', fontWeight: 600 }}>{cp.label}</div>
-                <div style={{ fontSize: 10, color: '#64748b' }}>{cp.time}</div>
+                <div style={{ fontSize: 10, color: '#7C838D' }}>{cp.time}</div>
               </div>
-              <span style={{ fontSize: 10, fontFamily: 'monospace', color: cp.hash === 'HEAD' ? '#38bdf8' : '#64748b', background: 'rgba(255,255,255,0.04)', padding: '2px 6px', borderRadius: 4 }}>
+              <span style={{ fontSize: 10, fontFamily: 'monospace', color: cp.hash === 'HEAD' ? '#8F97A2' : '#7C838D', background: 'rgba(255,255,255,0.04)', padding: '2px 6px', borderRadius: 4 }}>
                 {cp.hash}
               </span>
             </div>
@@ -354,7 +354,7 @@ function ArtifactsModule() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%', overflowY: 'auto' }}>
       <div style={{ padding: 14, background: 'rgba(15,23,42,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#38bdf8', marginBottom: 8 }}>ARCHITECTURE SPECIFICATION ARTIFACT</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#8F97A2', marginBottom: 8 }}>ARCHITECTURE SPECIFICATION ARTIFACT</div>
         <div style={{ fontSize: 12, color: '#cbd5e1', lineHeight: 1.6 }}>
           ### System Topography
           - **Floating Capsule**: Translucent frameless window anchoring at taskbar.
@@ -364,12 +364,12 @@ function ArtifactsModule() {
       </div>
 
       <div style={{ padding: 14, background: 'rgba(15,23,42,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', marginBottom: 8 }}>FLOW DIAGRAM ARTIFACT</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#E1D6BE', marginBottom: 8 }}>FLOW DIAGRAM ARTIFACT</div>
         <div style={{ height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, border: '1px dashed rgba(167,139,250,0.3)', borderRadius: 8 }}>
-          <div style={{ padding: '6px 12px', background: 'rgba(167,139,250,0.2)', color: '#c4b5fd', borderRadius: 6, fontSize: 11 }}>Capsule</div>
-          <span style={{ color: '#64748b' }}>➔</span>
+          <div style={{ padding: '6px 12px', background: 'rgba(233,224,207,0.22)', color: '#EDE5D2', borderRadius: 6, fontSize: 11 }}>Capsule</div>
+          <span style={{ color: '#7C838D' }}>➔</span>
           <div style={{ padding: '6px 12px', background: 'rgba(56,189,248,0.2)', color: '#7dd3fc', borderRadius: 6, fontSize: 11 }}>Spring Morph</div>
-          <span style={{ color: '#64748b' }}>➔</span>
+          <span style={{ color: '#7C838D' }}>➔</span>
           <div style={{ padding: '6px 12px', background: 'rgba(16,185,129,0.2)', color: '#6ee7b7', borderRadius: 6, fontSize: 11 }}>AI Studio</div>
         </div>
       </div>
@@ -387,11 +387,11 @@ function MemoryModule() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '0.1em' }}>PERSISTENT MEMORY & VECTOR EMBEDDINGS</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#7C838D', letterSpacing: '0.1em' }}>PERSISTENT MEMORY & VECTOR EMBEDDINGS</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {memoryItems.map((m, i) => (
           <div key={i} style={{ padding: '10px 14px', background: 'rgba(15,23,42,0.6)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ fontSize: 10, color: '#a78bfa', fontFamily: 'monospace', marginBottom: 2 }}>{m.key}</div>
+            <div style={{ fontSize: 10, color: '#E1D6BE', fontFamily: 'monospace', marginBottom: 2 }}>{m.key}</div>
             <div style={{ fontSize: 12, color: '#e2e8f0' }}>{m.val}</div>
           </div>
         ))}
@@ -412,7 +412,7 @@ function LogsModule() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%', background: 'rgba(5,7,18,0.9)', padding: 12, borderRadius: 12, fontFamily: 'monospace', fontSize: 11, overflowY: 'auto' }}>
       {logs.map((l, i) => (
-        <div key={i} style={{ color: '#94a3b8', lineHeight: 1.5 }}>
+        <div key={i} style={{ color: '#9BA3AC', lineHeight: 1.5 }}>
           {l}
         </div>
       ))}
@@ -477,11 +477,11 @@ export function AIStudio() {
         } as React.CSSProperties}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-          <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #a78bfa)', boxShadow: '0 0 10px #6366f1' }} />
+          <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'linear-gradient(135deg, #B92D32, #E1D6BE)', boxShadow: '0 0 10px #B92D32' }} />
           <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.14em', color: '#f1f5f9', textTransform: 'uppercase' }}>
             AI Engineering Studio
           </span>
-          <span style={{ fontSize: 10, color: '#64748b', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+          <span style={{ fontSize: 10, color: '#7C838D', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
             v3.8 Multi-Thread Runtime
           </span>
         </div>
@@ -492,7 +492,7 @@ export function AIStudio() {
             onClick={() => setStudioOpen(false)}
             style={{
               width: 26, height: 26, borderRadius: '50%', border: 'none',
-              background: 'rgba(255,255,255,0.06)', color: '#94a3b8',
+              background: 'rgba(255,255,255,0.06)', color: '#9BA3AC',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 12, transition: 'background 0.2s',
             }}
@@ -531,7 +531,7 @@ export function AIStudio() {
                 background: isActive ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.03)',
                 borderWidth: 1, borderStyle: 'solid',
                 borderColor: isActive ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.06)',
-                color: isActive ? '#c4b5fd' : '#94a3b8',
+                color: isActive ? '#EDE5D2' : '#9BA3AC',
                 fontSize: 11, fontWeight: isActive ? 700 : 500,
                 whiteSpace: 'nowrap',
                 transition: 'all 0.18s ease',
@@ -540,7 +540,7 @@ export function AIStudio() {
               <span>{mod.icon}</span>
               <span>{mod.name}</span>
               {mod.badge && (
-                <span style={{ fontSize: 9, background: isActive ? 'rgba(167,139,250,0.3)' : 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 4, color: isActive ? '#f1f5f9' : '#64748b' }}>
+                <span style={{ fontSize: 9, background: isActive ? 'rgba(167,139,250,0.3)' : 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 4, color: isActive ? '#f1f5f9' : '#7C838D' }}>
                   {mod.badge}
                 </span>
               )}
@@ -561,7 +561,7 @@ export function AIStudio() {
             </div>
             <button
               onClick={() => toggleDockPanel(activeModule.id)}
-              style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', padding: '3px 8px', borderRadius: 6, cursor: 'pointer' }}
+              style={{ fontSize: 10, color: '#E1D6BE', background: 'rgba(233,224,207,0.10)', border: '1px solid rgba(233,224,207,0.22)', padding: '3px 8px', borderRadius: 6, cursor: 'pointer' }}
             >
               {dockedPanels.includes(activeModule.id) ? 'Undock Side View' : 'Dock to Side'}
             </button>
@@ -573,7 +573,7 @@ export function AIStudio() {
 
         {/* Docked Secondary View */}
         <div style={{ background: 'rgba(15, 23, 42, 0.4)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: 16, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', letterSpacing: '0.1em', marginBottom: 10, textTransform: 'uppercase' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#7C838D', letterSpacing: '0.1em', marginBottom: 10, textTransform: 'uppercase' }}>
             DOCKED MODULE (CONVERSATION & STREAM)
           </div>
           <div style={{ flex: 1, overflow: 'hidden' }}>

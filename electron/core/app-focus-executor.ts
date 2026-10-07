@@ -36,10 +36,12 @@ export async function executeFocusApplication(
       }
     case 'not-running':
       // Structured "not currently running" result. Deliberately NOT converted
-      // into OPEN_APPLICATION — NOVA never starts a second copy here.
+      // into OPEN_APPLICATION — NOVA never starts a second copy here. The
+      // message keeps the required V03-S3-003 wording and tells the user how
+      // to launch it instead (acceptance Bug 6), without doing it for them.
       return {
         ok: false,
-        message: `${action.label} isn't currently running.`,
+        message: `${action.label} isn't currently running. Say "Open ${action.label}" to start it.`,
         label: action.label,
       }
     default:

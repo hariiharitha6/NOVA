@@ -207,7 +207,7 @@ export function VoicePanel({ onClose }: { onClose: () => void }) {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: isConnected || simulationMode ? '#10b981' : '#f59e0b', boxShadow: isConnected || simulationMode ? '0 0 8px #10b981' : 'none' }} />
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: '#c4b5fd', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: '#EDE5D2', textTransform: 'uppercase' }}>
             Voice Neural Interface
           </span>
         </div>
@@ -223,7 +223,7 @@ export function VoicePanel({ onClose }: { onClose: () => void }) {
               fontWeight: 600,
               border: '1px solid rgba(139,92,246,0.3)',
               background: simulationMode ? 'rgba(139,92,246,0.2)' : 'transparent',
-              color: simulationMode ? '#a78bfa' : '#64748b',
+              color: simulationMode ? '#E1D6BE' : '#7C838D',
               cursor: 'pointer',
             }}
           >
@@ -240,7 +240,7 @@ export function VoicePanel({ onClose }: { onClose: () => void }) {
               borderRadius: '50%',
               border: 'none',
               background: 'rgba(255,255,255,0.06)',
-              color: '#94a3b8',
+              color: '#9BA3AC',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -338,12 +338,12 @@ export function VoicePanel({ onClose }: { onClose: () => void }) {
               zIndex: 10,
               background:
                 currentState === 'listening'
-                  ? 'radial-gradient(circle at 35% 35%, #8b5cf6, #4c1d95)'
+                  ? 'radial-gradient(circle at 35% 35%, #B92D32, #4A0F14)'
                   : currentState === 'thinking'
                   ? 'radial-gradient(circle at 35% 35%, #ec4899, #831843)'
                   : currentState === 'speaking'
                   ? 'radial-gradient(circle at 35% 35%, #3b82f6, #1e3a8a)'
-                  : 'radial-gradient(circle at 35% 35%, #334155, #0f172a)',
+                  : 'radial-gradient(circle at 35% 35%, #2E333A, #14171C)',
               boxShadow:
                 currentState === 'listening'
                   ? '0 0 35px rgba(139, 92, 246, 0.7)'
@@ -366,7 +366,7 @@ export function VoicePanel({ onClose }: { onClose: () => void }) {
 
         {/* State Label */}
         <div style={{ marginBottom: 16, textAlign: 'center' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', color: '#94a3b8', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', color: '#9BA3AC', textTransform: 'uppercase' }}>
             {currentState === 'idle'
               ? 'Tap microphone to speak'
               : currentState === 'listening'
@@ -400,10 +400,10 @@ export function VoicePanel({ onClose }: { onClose: () => void }) {
                   borderRadius: 2,
                   background:
                     currentState === 'listening'
-                      ? '#a78bfa'
+                      ? '#E1D6BE'
                       : currentState === 'speaking'
                       ? '#60a5fa'
-                      : '#334155',
+                      : '#2E333A',
                 }}
               />
             );
@@ -429,7 +429,7 @@ export function VoicePanel({ onClose }: { onClose: () => void }) {
           {/* User Partial / Final Transcription */}
           {(displayPartial || displayFinal) && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', background: 'rgba(167,139,250,0.15)', padding: '2px 6px', borderRadius: 4 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#E1D6BE', background: 'rgba(233,224,207,0.15)', padding: '2px 6px', borderRadius: 4 }}>
                 USER
               </span>
               <div style={{ fontSize: 12, color: displayPartial ? '#cbd5e1' : '#f8fafc', fontStyle: displayPartial ? 'italic' : 'normal' }}>
@@ -454,7 +454,7 @@ export function VoicePanel({ onClose }: { onClose: () => void }) {
           {/* Empty Prompt State */}
           {!displayPartial && !displayFinal && !displayResponse && (
             <div style={{ margin: 'auto', fontSize: 11, color: '#475569', textAlign: 'center' }}>
-              Say something like <span style={{ color: '#94a3b8' }}>"Check CPU load"</span> or <span style={{ color: '#94a3b8' }}>"Summarize emails"</span>
+              Say something like <span style={{ color: '#9BA3AC' }}>"Check CPU load"</span> or <span style={{ color: '#9BA3AC' }}>"Summarize emails"</span>
             </div>
           )}
         </div>

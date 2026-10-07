@@ -8,7 +8,7 @@ import { createWindowsLauncher } from './platform/windows-launcher'
 import { seedDefaultFileFolders } from './platform/windows-shortcuts'
 import { createWindowManager } from './windows'
 import { registerHotkey, unregisterAllHotkeys, registerPttHotkey, registerEscapeCancel, unregisterEscapeCancel } from './hotkey'
-import { registerIpcHandlers, broadcastConfig, broadcastConfirmationState } from './ipc'
+import { registerIpcHandlers, broadcastConfig, broadcastConfirmationState, broadcastCommandResult, rememberVoiceListResult } from './ipc'
 import { executeCommand, createCommandPipelineDeps } from './core/command-pipeline'
 import { createConfirmationGate } from './core/confirmation'
 import type { ConfirmationGate } from './core/confirmation'
@@ -139,12 +139,12 @@ if (!gotTheLock) {
     const voiceInstance = createVoiceController({
       recognizer,
       isEnabled: () => configStore.get().voiceEnabled,
-      executeCommand: (input) =>
+      executeCommand: async (input) => {
         // SAME pipeline factory as the typed IPC path, so voice and typed input
         // can never diverge (focus / favorites / recents / settings included).
         // `source: 'voice'` adds ONLY the fixed confirmation phrases, and only
         // while a confirmation is actually pending.
-        executeCommand(
+        const response = await executeCommand(
           input,
           createCommandPipelineDeps({
             configStore,
@@ -157,11 +157,30 @@ if (!gotTheLock) {
             openSettings: () => windowManager?.showSettings(),
           }),
           { source: 'voice' },
-        ),
+        )
+        // v0.3 acceptance Bugs 3/4: a voice response is produced entirely in
+        // this process and never passes through the overlay's invoke path, so
+        // it is pushed to the windows here. Favorites/recents are LISTS: open
+        // the overlay first (it is the surface that renders them), then deliver.
+        const data = response.kind === 'result' ? response.result.data : null
+        if (data && (data.kind === 'favorites' || data.kind === 'recents')) {
+          windowManager?.showOverlay()
+          rememberVoiceListResult(response)
+        }
+        broadcastCommandResult(response)
+        return response
+      },
       emit: (state) => {
         windowManager?.setVoiceMode(state.phase !== 'idle')
         if (state.phase === 'listening') {
           registerEscapeCancel(() => voice?.cancelListening())
+        } else if (state.phase === 'confirming') {
+          // Escape while a prompt is pending: stop listening AND cancel the
+          // prompt (never confirms — consistent with the overlay's Escape).
+          registerEscapeCancel(() => {
+            voice?.cancelListening()
+            confirmationGate?.invalidate('cancelled')
+          })
         } else {
           unregisterEscapeCancel()
         }

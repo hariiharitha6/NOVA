@@ -9,12 +9,19 @@ import type { CommandResponse } from '../types'
 import type { SpeechRecognizer } from './recognizer'
 import type { VoiceState } from './types'
 import { idleVoiceState } from './types'
-import { INACTIVITY_TIMEOUT_MS, MAX_LISTENING_MS, RESULT_DISPLAY_MS } from './constants'
+import { stripWakePhraseFromTranscript } from './wake-phrase'
+import { DEFAULT_WAKE_PHRASE, INACTIVITY_TIMEOUT_MS, MAX_LISTENING_MS, RESULT_DISPLAY_MS } from './constants'
 
 export interface VoiceControllerDeps {
   recognizer: SpeechRecognizer
   /** Whether voice is currently enabled (read live from config). */
   isEnabled: () => boolean
+  /**
+   * The user's configured wake phrase as a string (used to strip the phrase
+   * that bleeds into the STT transcript when a wake hand-off starts mid-phrase).
+   * Defaults to the canonical "Hey NOVA" when not provided.
+   */
+  getWakePhrase?: () => string
   /** The shared command pipeline (identical to typed-command execution). */
   executeCommand: (input: string) => Promise<CommandResponse>
   /** Broadcast a state change to the UI (main process -> renderer windows). */
@@ -50,6 +57,7 @@ export interface VoiceController {
 
 export function createVoiceController(deps: VoiceControllerDeps): VoiceController {
   const { recognizer, isEnabled, executeCommand, emit } = deps
+  const getWakePhrase = deps.getWakePhrase ?? (() => DEFAULT_WAKE_PHRASE)
 
   let state: VoiceState = idleVoiceState()
   let maxTimer: ReturnType<typeof setTimeout> | null = null
@@ -93,6 +101,12 @@ export function createVoiceController(deps: VoiceControllerDeps): VoiceControlle
   }
 
   function armInactivity(): void {
+    // While a confirmation is pending the ONLY thing that should settle the
+    // prompt is a spoken answer, the overlay buttons, or the gate's own
+    // timeout. Silently finalising an empty "confirmation session" over and
+    // over (restart stream -> idle -> restart) just churns the recognizer, so
+    // the inactivity timer is never armed in that phase.
+    if (state.phase === 'confirming') return
     if (inactivityTimer !== null) clearTimeout(inactivityTimer)
     inactivityTimer = setTimeout(stopAndExecute, INACTIVITY_TIMEOUT_MS)
   }
@@ -123,14 +137,36 @@ export function createVoiceController(deps: VoiceControllerDeps): VoiceControlle
     )
   }
 
+  /**
+   * Open a fresh STT stream after a session was finished. Used to keep the
+   * microphone path warm while a confirmation prompt is pending so the spoken
+   * answer is captured without a second PTT press.
+   */
+  function restartRecognizerSession(): void {
+    try {
+      recognizer.start()
+    } catch {
+      // The gate (not the recognizer) owns the prompt lifetime; if the engine
+      // cannot reopen a stream, the answer simply has to come from the overlay.
+    }
+  }
+
   async function stopAndExecute(): Promise<void> {
-    if (state.phase !== 'listening') return
+    const fromPhase = state.phase
+    // 'confirming' is accepted as well: that is how a spoken "yes" / "no"
+    // (or a superseding command) is captured while the prompt is on screen.
+    if (fromPhase !== 'listening' && fromPhase !== 'confirming') return
     clearTimers()
 
     const sid = sessionId
     let transcript = ''
     try {
-      transcript = recognizer.finishAndGetTranscript().trim()
+      const raw = recognizer.finishAndGetTranscript().trim()
+      // A wake hand-off starts the STT session mid-phrase, so the wake phrase
+      // itself often bleeds into the first partial ("Hey NOVA open chrome").
+      // Strip it here so the shared pipeline only ever sees the real command;
+      // a bare wake phrase ("Hey NOVA" alone) must execute nothing.
+      transcript = stripWakePhraseFromTranscript(raw, getWakePhrase()).trim()
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       fail(`Recognition failed (${detail})`)
@@ -138,6 +174,14 @@ export function createVoiceController(deps: VoiceControllerDeps): VoiceControlle
     }
 
     if (!transcript) {
+      if (fromPhase === 'confirming') {
+        // Silence is not an answer: reopen a clean stream so the user can still
+        // say "yes"/"no", but do NOT re-arm the inactivity loop. The gate's own
+        // timeout remains the only way an unanswered prompt expires, and a
+        // silence-only session no longer churns the recognizer.
+        restartRecognizerSession()
+        return
+      }
       toIdle()
       return
     }
@@ -198,6 +242,9 @@ export function createVoiceController(deps: VoiceControllerDeps): VoiceControlle
         transcript,
         message: `${response.request.prompt} Say "yes" to confirm or "no" to cancel.`,
       })
+      // Stay hot: reopen the STT stream immediately so the spoken answer is
+      // captured without the user having to press PTT again.
+      restartRecognizerSession()
       return
     } else if (response.kind === 'cancelled') {
       if (response.reason === 'user') {
@@ -242,7 +289,7 @@ export function createVoiceController(deps: VoiceControllerDeps): VoiceControlle
       // processing: ignore the toggle until the current command settles.
     },
     cancelListening(): void {
-      if (state.phase !== 'listening') return
+      if (state.phase !== 'listening' && state.phase !== 'confirming') return
       clearTimers()
       try {
         recognizer.cancel()
@@ -253,10 +300,15 @@ export function createVoiceController(deps: VoiceControllerDeps): VoiceControlle
     },
     clearConfirmation(): void {
       if (state.phase !== 'confirming') return
+      try {
+        recognizer.cancel()
+      } catch {
+        // ignore
+      }
       toIdle()
     },
     acceptAudio(samples: Float32Array): void {
-      if (state.phase !== 'listening') return
+      if (state.phase !== 'listening' && state.phase !== 'confirming') return
       try {
         recognizer.acceptAudio(samples)
       } catch (error) {
@@ -270,9 +322,23 @@ export function createVoiceController(deps: VoiceControllerDeps): VoiceControlle
         setState({ ...state, partial })
         armInactivity()
       }
+      // Endpoint detection (sherpa trailing-silence rules) means the speaker
+      // finished. Finalise NOW instead of waiting for the inactivity/max
+      // timers: that is what makes "say the command and stop talking" submit
+      // immediately, and what lets a spoken "yes"/"no" settle the prompt
+      // without a second PTT press.
+      //
+      // A bare endpoint is NEVER enough on its own: if the partial is empty we
+      // are still in the silence-before-speech region (sherpa rule 1) and must
+      // not finalise — doing so would submit nothing and drop the session
+      // before the user had a chance to speak. This applies to 'confirming'
+      // too, so a silence-only "answer attempt" never churns the recognizer.
+      if (recognizer.isEndpoint?.() && partial.trim()) {
+        void stopAndExecute()
+      }
     },
     micError(message: string): void {
-      if (state.phase !== 'listening') return
+      if (state.phase !== 'listening' && state.phase !== 'confirming') return
       fail(`Microphone unavailable (${message})`)
     },
     setEnabled(enabled: boolean): void {

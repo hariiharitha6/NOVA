@@ -806,7 +806,7 @@ describe('V03-S4: H — stale confirmations', () => {
 
 describe('V03-S4: I — spoken confirmation', () => {
   it('recognises exactly the fixed confirm vocabulary', () => {
-    expect(CONFIRM_PHRASES).toEqual(['yes', 'confirm', 'do it'])
+    expect(CONFIRM_PHRASES).toEqual(['yes', 'yeah', 'confirm', 'do it'])
     for (const phrase of CONFIRM_PHRASES) {
       expect(resolveConfirmationPhrase(phrase)).toBe('confirm')
       expect(resolveConfirmationPhrase(phrase.toUpperCase())).toBe('confirm')
@@ -815,7 +815,7 @@ describe('V03-S4: I — spoken confirmation', () => {
   })
 
   it('does not recognise anything else as a confirmation', () => {
-    for (const text of ['y', 'yep', 'yeah', 'yes please open chrome', 'do it now', 'confirm open chrome', '']) {
+    for (const text of ['y', 'yep', 'yes please open chrome', 'do it now', 'confirm open chrome', '']) {
       expect(resolveConfirmationPhrase(text)).toBeNull()
     }
   })

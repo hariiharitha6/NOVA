@@ -19,6 +19,14 @@ export interface SpeechRecognizer {
   acceptAudio(samples: Float32Array): void
   /** Current partial transcript for the active session. */
   partialTranscript(): string
+  /**
+   * Whether the streaming engine detected an utterance endpoint — the speaker
+   * finished and the trailing-silence rules fired. Optional: when present,
+   * NOVA finalises the session the moment speech ends instead of waiting out
+   * the inactivity/max-listening timers, so a command is executed as soon as
+   * the user stops talking.
+   */
+  isEndpoint?(): boolean
   /** Mark input finished, decode the tail, and return the final transcript. */
   finishAndGetTranscript(): string
   /** Discard the active session without producing a final result. */

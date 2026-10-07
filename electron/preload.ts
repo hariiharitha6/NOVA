@@ -46,6 +46,14 @@ const nova = {
     ipcRenderer.on('nova:confirmation-state', listener)
     return () => ipcRenderer.removeListener('nova:confirmation-state', listener)
   },
+  // v0.3 Bugs 3/4: voice responses are broadcast to every window, so a result
+  // produced by a spoken command renders in the overlay like a typed one.
+  onCommandResult: (cb: (response: unknown) => void) => {
+    const listener = (_event: unknown, response: unknown): void => cb(response)
+    ipcRenderer.on('nova:command-result', listener)
+    return () => ipcRenderer.removeListener('nova:command-result', listener)
+  },
+  getLastVoiceListResult: () => ipcRenderer.invoke('nova:last-voice-list-result'),
   onWakeStatus: (cb: (status: unknown) => void) => {
     ipcRenderer.on('nova:wake-status-changed', (_event, status) => cb(status))
     return () => ipcRenderer.removeListener('nova:wake-status-changed', cb)

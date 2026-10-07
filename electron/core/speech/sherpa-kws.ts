@@ -175,8 +175,13 @@ export class SherpaKeywordSpotter implements KeywordSpotter {
 
   start(): void {
     if (!this.kws) throw new Error('Keyword spotter is not initialized')
-    this.reset()
+    // Free the previous stream BEFORE opening a new one. The controller arms
+    // and disarms on every voice phase change (once per command), so without
+    // this each re-arm leaked one native stream and the detector degraded the
+    // longer NOVA stayed open (acceptance Bug 8).
+    this.releaseStream()
     this.stream = this.kws.createStream()
+    this.detected = false
   }
 
   acceptAudio(samples: Float32Array): void {
@@ -207,15 +212,19 @@ export class SherpaKeywordSpotter implements KeywordSpotter {
     this.detected = false
   }
 
-  dispose(): void {
-    if (this.stream) {
-      try {
-        this.stream.free()
-      } catch {
-        // ignore
-      }
-      this.stream = null
+  /** Free the active stream, if any. Safe to call when none exists. */
+  private releaseStream(): void {
+    if (!this.stream) return
+    try {
+      this.stream.free()
+    } catch {
+      // ignore
     }
+    this.stream = null
+  }
+
+  dispose(): void {
+    this.releaseStream()
     if (this.kws) {
       try {
         this.kws.free()

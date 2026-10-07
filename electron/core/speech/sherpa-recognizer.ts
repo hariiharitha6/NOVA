@@ -39,6 +39,37 @@ interface SherpaRecognizer {
   free(): void
 }
 
+export interface SherpaEndpointConfig {
+  enableEndpoint: number
+  rule1MinTrailingSilence: number
+  rule2MinTrailingSilence: number
+  rule3MinUtteranceLength: number
+}
+
+/**
+ * Speech-end rules for the sherpa-onnx online recognizer.
+ *
+ *  - Rule 1 (no non-silence at all): a silence-only session finalises after
+ *    `rule1` seconds. The controller never submits an empty transcript, so a
+ *    snappy value is safe.
+ *  - Rule 2 (non-silence already present): this IS the speech-end window and
+ *    the real "are you done talking?" decision. `1.2` s restores sherpa-onnx's
+ *    own upstream default; the previous `0.8` s fired on ordinary mid-phrase
+ *    pauses and executed commands before the speaker finished their sentence
+ *    (acceptance Bug 6). A short pause between two words < 1.2 s does not
+ *    finalise; once the user really stops, the command submits immediately.
+ *  - Rule 3: hard cap on continuous utterance length (never hit in practice —
+ *    `MAX_LISTENING_MS` ends the session sooner).
+ */
+export function buildSherpaEndpointConfig(): SherpaEndpointConfig {
+  return {
+    enableEndpoint: 1,
+    rule1MinTrailingSilence: 1.8,
+    rule2MinTrailingSilence: 1.2,
+    rule3MinUtteranceLength: 20,
+  }
+}
+
 export class SherpaSpeechRecognizer implements SpeechRecognizer {
   readonly kind = 'sherpa-onnx'
 
@@ -86,14 +117,7 @@ export class SherpaSpeechRecognizer implements SpeechRecognizer {
       },
       decodingMethod: 'greedy_search',
       maxActivePaths: 4,
-      enableEndpoint: 1,
-      // Shorter trailing silence for quick command phrases like "Open Chrome".
-      // Rule 1: must NOT contain non-silence — long silence finalises.
-      rule1MinTrailingSilence: 1.8,
-      // Rule 2: must contain non-silence — shorter silence finalises.
-      rule2MinTrailingSilence: 0.8,
-      // Rule 3: hard utterance length cap.
-      rule3MinUtteranceLength: 20,
+      ...buildSherpaEndpointConfig(),
     }
 
     const recognizer = sherpa.createOnlineRecognizer(config)
@@ -125,14 +149,29 @@ export class SherpaSpeechRecognizer implements SpeechRecognizer {
     return this.lastText
   }
 
+  isEndpoint(): boolean {
+    if (!this.recognizer || !this.stream) return false
+    try {
+      return this.recognizer.isEndpoint(this.stream)
+    } catch {
+      return false
+    }
+  }
+
   finishAndGetTranscript(): string {
     if (!this.recognizer || !this.stream) return ''
-    this.stream.inputFinished()
-    while (this.recognizer.isReady(this.stream)) {
-      this.recognizer.decode(this.stream)
+    const stream = this.stream
+    stream.inputFinished()
+    while (this.recognizer.isReady(stream)) {
+      this.recognizer.decode(stream)
     }
-    const result = this.recognizer.getResult(this.stream)
+    const result = this.recognizer.getResult(stream)
     this.lastText = result.text ?? ''
+    // The finished stream can never accept more audio; free it immediately so
+    // a finalised session does not leave a WASM stream allocated until the
+    // next start()/cancel() (acceptance Bug 9).
+    stream.free()
+    this.stream = null
     return this.lastText
   }
 

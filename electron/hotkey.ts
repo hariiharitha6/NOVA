@@ -1,5 +1,5 @@
-// Global hotkey registration. The overlay hotkey (default Control+Space) and
-// the PTT hotkey (default Control+Shift+Space) are fully independent; each has
+// Global hotkey registration. The overlay hotkey (default Control+J) and
+// the PTT hotkey (default Control+Shift+J) are fully independent; each has
 // its own current registration and unregistering one never touches the other.
 
 import { globalShortcut } from 'electron'

@@ -41,3 +41,60 @@ export function slugifyWakePhrase(phrase: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
 }
+
+const WAKE_LEAD_INTERJECTIONS = new Set(['hey', 'hi', 'hello', 'okay', 'ok', 'alright'])
+
+function wakeTokens(text: string): string[] {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9']/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+}
+
+/**
+ * Strip a leading WAKE PHRASE from a transcript so the wake hand-off is clean:
+ * the STT session starts the moment the keyword is spotted, so the first
+ * partial often bleeds the wake phrase into the command ("Hey NOVA open
+ * chrome"). This is a transcription-cleanup helper, NOT a command parser — the
+ * remainder still flows through the exact same shared command engine as any
+ * typed or PTT command.
+ *
+ * Rules:
+ *  - The full phrase is always stripped when it leads the transcript.
+ *  - When the phrase starts with a common interjection ("Hey NOVA"), the
+ *    interjection may be missing from the audio ("NOVA open chrome") and the
+ *    phrase's remaining words are stripped instead.
+ *  - Anything else is left untouched, so ordinary first words (an app or site
+ *    literally named "Nova", "Hello", ...) are never eaten.
+ *
+ * A bare wake phrase ("Hey NOVA") leaves an empty remainder; the caller treats
+ * that as "the user said nothing" and executes no command.
+ */
+export function stripWakePhraseFromTranscript(
+  transcript: string,
+  wakePhrase: string = 'Hey NOVA',
+): string {
+  const text = transcript.trim()
+  if (!text) return text
+  const normalized = normalizeWakePhrase(wakePhrase)
+  if (!normalized) return text
+
+  const words = wakeTokens(text)
+  const wake = wakeTokens(normalized)
+  if (wake.length === 0) return text
+
+  let stripLen = 0
+  if (words.slice(0, wake.length).join(' ') === wake.join(' ')) {
+    stripLen = wake.length
+  } else if (
+    wake.length > 1 &&
+    WAKE_LEAD_INTERJECTIONS.has(wake[0]) &&
+    words.slice(0, wake.length - 1).join(' ') === wake.slice(1).join(' ')
+  ) {
+    stripLen = wake.length - 1
+  }
+  if (stripLen === 0) return text
+  return words.slice(stripLen).join(' ')
+}

@@ -19,7 +19,7 @@ function statusColor(phase: string): string {
     case 'confirming':
       return '#fbbf24'
     default:
-      return '#a78bfa'
+      return '#E1D6BE'
   }
 }
 
@@ -83,7 +83,7 @@ export function VoiceIndicator() {
                   width: 34,
                   height: 34,
                   borderRadius: '50%',
-                  background: 'radial-gradient(circle at 35% 30%, #c4b5fd, #8b5cf6 60%, #4c1d95)',
+                  background: 'radial-gradient(circle at 35% 30%, #EDE5D2, #B92D32 60%, #4A0F14)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

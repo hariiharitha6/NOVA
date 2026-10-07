@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <!-- A-frame: brushed silver -->
+    <linearGradient id="silver" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F4F6F8"/>
+      <stop offset="0.45" stop-color="#C9CFD8"/>
+      <stop offset="1" stop-color="#8F97A2"/>
+    </linearGradient>
+    <!-- J: deep crimson with a quiet fire gradient -->
+    <linearGradient id="crimson" x1="0.2" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#D84A50"/>
+      <stop offset="0.55" stop-color="#A92B31"/>
+      <stop offset="1" stop-color="#8E2026"/>
+    </linearGradient>
+  </defs>
+
+  <!--
+    AJ monogram — "interlocked frame"
+      A  = apex + left stroke + crossbar drawn in brushed silver (the frame).
+      J  = one continuous crimson stroke: it shares the A's right diagonal,
+           then descends lower and sweeps into the bottom hook, its tip
+           tucking up under the A's left foot. One symbol, one geometric idea.
+  -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" transform="translate(14,-14)">
+    <!-- J: shared right diagonal descending into the hook -->
+    <path d="M122 40 L180 168 C186 208 154 224 118 224 C84 224 60 208 58 180"
+          stroke="url(#crimson)" stroke-width="34"/>
+    <!-- A: left stroke -->
+    <path d="M122 40 L38 158" stroke="url(#silver)" stroke-width="24"/>
+    <!-- A: crossbar (closes the frame, meets the crimson stroke) -->
+    <path d="M66 108 L144 102" stroke="url(#silver)" stroke-width="18"/>
+  </g>
+</svg>

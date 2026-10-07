@@ -13,7 +13,7 @@ import {
 import type { Launcher } from './core/launcher'
 import type { ConfirmationGate } from './core/confirmation'
 import type { CommandInterpreter } from './core/ai/types'
-import type { ConfirmationRequest, ConfigStore, DisplayInfo, NovaConfig } from './core/types'
+import type { CommandResponse, ConfirmationRequest, ConfigStore, DisplayInfo, NovaConfig } from './core/types'
 import type { VoiceController } from './core/speech/voice-controller'
 import type { WakeWordController } from './core/speech/wake-controller'
 import type { WindowManager } from './windows'
@@ -74,6 +74,41 @@ export function broadcastConfirmationState(confirmation: ConfirmationGate): void
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send('nova:confirmation-state', request)
   }
+}
+
+/**
+ * v0.3 acceptance Bugs 3/4 — VOICE commands are executed in this process, so
+ * their response never travels through the overlay's `nova:run-command` invoke
+ * and the overlay would otherwise never render it. Push every voice response to
+ * every window so a voice result appears exactly like a typed one.
+ */
+export function broadcastCommandResult(response: CommandResponse): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('nova:command-result', response)
+  }
+}
+
+/** How long a list result stays fetchable for an overlay that was still loading. */
+const VOICE_LIST_RESULT_TTL_MS = 10_000
+let lastVoiceListResult: { response: CommandResponse; expiresAt: number } | null = null
+
+/**
+ * Remember the most recent voice LIST result (favorites/recents) for a short
+ * window. The broadcast above is lost if the overlay's renderer has not
+ * finished loading yet (the window is created lazily on first show), so the
+ * overlay also fetches this when it opens. Consumed on read and expired after
+ * 10 s, so an overlay opened much later never replays a stale list.
+ */
+export function rememberVoiceListResult(response: CommandResponse): void {
+  lastVoiceListResult = { response, expiresAt: Date.now() + VOICE_LIST_RESULT_TTL_MS }
+}
+
+function takeVoiceListResult(): CommandResponse | null {
+  const pending = lastVoiceListResult
+  lastVoiceListResult = null
+  if (!pending) return null
+  if (Date.now() > pending.expiresAt) return null
+  return pending.response
 }
 
 /** (Re)apply the PTT registration from config. Reverts to the previous working
@@ -212,6 +247,10 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     }
     return executeCommand(raw, pipeline)
   })
+
+  // v0.3 Bugs 3/4 — the overlay fetches the most recent voice list result when
+  // it opens, covering a window whose renderer missed the live broadcast.
+  ipcMain.handle('nova:last-voice-list-result', () => takeVoiceListResult())
 
   // ─── V03-S4 confirmation gate ────────────────────────────────────────────
   // The renderer can only ever echo a token it was given. It cannot submit

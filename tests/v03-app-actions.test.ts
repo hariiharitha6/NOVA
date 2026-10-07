@@ -204,7 +204,11 @@ describe('V03-S3: FOCUS_APPLICATION execution', () => {
     expect(response.kind).toBe('launched')
     if (response.kind !== 'launched') throw new Error('unreachable')
     expect(response.result.ok).toBe(false)
-    expect(response.result.message).toBe("Google Chrome isn't currently running.")
+    // V03-S3-003 wording is retained; acceptance Bug 6 adds the actionable
+    // hint telling the user how to start the app instead.
+    expect(response.result.message).toBe(
+      'Google Chrome isn\'t currently running. Say "Open Google Chrome" to start it.',
+    )
     expect(response.result.label).toBe('Google Chrome')
   })
 

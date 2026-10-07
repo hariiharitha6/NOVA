@@ -3,21 +3,22 @@
 @tailwind utilities;
 
 /* ════════════════════════════════════════════════════════════
-   NOVA Royal Identity — design tokens
-   minimal · premium · futuristic · royal · dark
+   NOVA Identity — design tokens
+   graphite · gunmetal · crimson · champagne
+   minimal · premium · futuristic · dark
    ════════════════════════════════════════════════════════════ */
 :root {
-  --nova-bg: #0b0712;
-  --nova-surface: #151021;
-  --nova-primary: #7c3aed;
-  --nova-royal: #a855f7;
-  --nova-highlight: #c084fc;
-  --nova-text: #f5f3ff;
-  --nova-muted: #a8a0b8;
+  --nova-bg: #0C0E12;
+  --nova-surface: #171A1F;
+  --nova-primary: #B92D32;
+  --nova-royal: #C23036;
+  --nova-highlight: #D84A50;
+  --nova-text: #F1F3F6;
+  --nova-muted: #9BA3AC;
 
-  --nova-surface-glass: rgba(21, 16, 33, 0.86);
-  --nova-border: rgba(168, 85, 247, 0.16);
-  --nova-border-strong: rgba(168, 85, 247, 0.38);
+  --nova-surface-glass: rgba(20, 22, 27, 0.86);
+  --nova-border: rgba(185, 45, 50, 0.18);
+  --nova-border-strong: rgba(216, 74, 80, 0.42);
   --nova-success: #34d399;
   --nova-danger: #f87171;
 }
@@ -58,8 +59,8 @@ body {
   }
 
   .glass-light {
-    background: rgba(245, 243, 255, 0.03);
-    border: 1px solid rgba(245, 243, 255, 0.06);
+    background: rgba(241, 243, 246, 0.03);
+    border: 1px solid rgba(241, 243, 246, 0.06);
   }
 
   .glass-hover {
@@ -70,14 +71,14 @@ body {
   }
 
   .glass-hover:hover {
-    background: rgba(124, 58, 237, 0.14);
+    background: rgba(185, 45, 50, 0.14);
     border-color: var(--nova-border-strong);
   }
 
   .royal-ring {
     box-shadow:
       0 0 0 1px var(--nova-border-strong),
-      0 0 24px rgba(124, 58, 237, 0.18);
+      0 0 24px rgba(185, 45, 50, 0.18);
   }
 
   .drag-region {
@@ -100,7 +101,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(168, 85, 247, 0.35);
+  background: rgba(185, 45, 50, 0.4);
   border-radius: 2px;
 }
 
@@ -120,10 +121,10 @@ body {
 @keyframes nova-listen {
   0%,
   100% {
-    box-shadow: 0 0 10px rgba(168, 85, 247, 0.45);
+    box-shadow: 0 0 10px rgba(185, 45, 50, 0.45);
   }
   50% {
-    box-shadow: 0 0 22px rgba(192, 132, 252, 0.85);
+    box-shadow: 0 0 22px rgba(216, 74, 80, 0.85);
   }
 }
 
@@ -206,7 +207,7 @@ body {
 }
 
 .command-input::placeholder {
-  color: rgba(168, 160, 184, 0.55);
+  color: rgba(155, 163, 172, 0.55);
 }
 
 /* ─── Quick Action Chips ──────────────────────────────────── */
@@ -215,8 +216,8 @@ body {
   align-items: center;
   padding: 12px 8px;
   border-radius: 12px;
-  background: rgba(245, 243, 255, 0.04);
-  border: 1px solid rgba(245, 243, 255, 0.07);
+  background: rgba(241, 243, 246, 0.04);
+  border: 1px solid rgba(241, 243, 246, 0.07);
   cursor: pointer;
   transition:
     background 0.18s ease,
@@ -231,14 +232,14 @@ body {
 
 .quick-action-btn:hover,
 .quick-action-btn:focus-visible {
-  background: rgba(124, 58, 237, 0.16);
+  background: rgba(185, 45, 50, 0.16);
   border-color: var(--nova-border-strong);
   color: var(--nova-highlight);
   outline: none;
 }
 
 .quick-action-btn:active {
-  background: rgba(124, 58, 237, 0.26);
+  background: rgba(185, 45, 50, 0.26);
 }
 
 /* ─── Toggle ──────────────────────────────────────────────── */
@@ -259,7 +260,7 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #f5f3ff;
+  background: #E7E9ED;
   transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
 }

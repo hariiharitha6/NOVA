@@ -8,6 +8,15 @@ import { resample } from '../../electron/core/speech/audio-utils'
 type F32 = Float32Array<ArrayBuffer>
 
 /**
+ * Wake capture retry policy. A transient mic failure (device still settling,
+ * a permissions prompt, a driver hiccup) must not permanently kill wake-word
+ * detection for the whole process lifetime: retry a bounded number of times
+ * with a delay, then give up quietly until the next arm/disarm cycle.
+ */
+const WAKEMIC_MAX_ATTEMPTS = 3
+const WAKEMIC_RETRY_DELAY_MS = 4000
+
+/**
  * Captures a lightweight continuous microphone stream while the wake-word
  * detector is ARMED and streams mono Float32 PCM (16 kHz, small chunks) to the
  * main process keyword spotter.
@@ -34,6 +43,7 @@ export function useWakeMic(): void {
   const streamRef = useRef<MediaStream | null>(null)
   const processorRef = useRef<ScriptProcessorNode | null>(null)
   const actualRateRef = useRef<number>(TARGET_SAMPLE_RATE)
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!armed) {
@@ -42,6 +52,16 @@ export function useWakeMic(): void {
     }
 
     let cancelled = false
+    let attempts = 0
+
+    function scheduleRetry(): void {
+      if (cancelled) return
+      if (attempts >= WAKEMIC_MAX_ATTEMPTS) return
+      retryTimerRef.current = setTimeout(() => {
+        retryTimerRef.current = null
+        void start()
+      }, WAKEMIC_RETRY_DELAY_MS)
+    }
 
     async function start(): Promise<void> {
       try {
@@ -62,6 +82,8 @@ export function useWakeMic(): void {
         const audioTrack = stream.getAudioTracks()[0]
         if (!audioTrack) {
           stream.getTracks().forEach((t) => t.stop())
+          attempts++
+          scheduleRetry()
           return
         }
         streamRef.current = stream
@@ -97,20 +119,34 @@ export function useWakeMic(): void {
         }
         source.connect(processor)
         processor.connect(ctx.destination)
+        // A successful capture resets the budget; a later transient blip can
+        // still recover without permanently disarming wake detection.
+        attempts = 0
       } catch {
-        // Wake detection is optional; a mic error simply leaves it unarmed.
-        // No crash. Main already knows how to ignore wake audio.
+        // Wake detection is optional and must never crash NOVA; a mic error just
+        // leaves it unarmed. Retry a bounded number of times in case the device
+        // was momentarily unavailable, then stop until the next re-arm.
+        attempts++
+        scheduleRetry()
       }
     }
 
     void start()
     return () => {
       cancelled = true
+      if (retryTimerRef.current !== null) {
+        clearTimeout(retryTimerRef.current)
+        retryTimerRef.current = null
+      }
       stopCapture()
     }
   }, [armed])
 
   function stopCapture(): void {
+    if (retryTimerRef.current !== null) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
     try {
       processorRef.current?.disconnect()
     } catch {

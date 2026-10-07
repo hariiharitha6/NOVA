@@ -21,6 +21,7 @@
 //
 //   MEDIUM — a real system-side or external effect:
 //            OPEN_APPLICATION (starts a process on the machine),
+//            OPEN_SYSTEM_SETTINGS (starts the Windows Settings app),
 //            any website/file/folder whose target is NOT registry-validated
 //            (an origin or path NOVA never vetted, e.g. a URL pasted in by hand
 //            or proposed by a future interpreter).
@@ -52,7 +53,14 @@ const ALWAYS_LOW: ReadonlySet<Intent> = new Set<Intent>([
 ])
 
 /** Intents that are always MEDIUM: they start a process on the machine. */
-const ALWAYS_MEDIUM: ReadonlySet<Intent> = new Set<Intent>(['OPEN_APPLICATION'])
+const ALWAYS_MEDIUM: ReadonlySet<Intent> = new Set<Intent>([
+  'OPEN_APPLICATION',
+  // Windows Settings is an OS application, so opening it starts a process —
+  // exactly like OPEN_APPLICATION, and therefore confirmation-gated. Listed
+  // explicitly (rather than relying on the fail-closed default below) so the
+  // level is deliberate, not accidental.
+  'OPEN_SYSTEM_SETTINGS',
+])
 
 /**
  * Intents that are LOW only while the target is registry-validated (the user

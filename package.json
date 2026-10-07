@@ -48,14 +48,18 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "resources/icons/nova.ico"
+      "icon": "resources/icons/nova.ico",
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
       "installerIcon": "resources/icons/nova.ico",
       "uninstallerIcon": "resources/icons/nova.ico",
-      "shortcutName": "NOVA"
+      "shortcutName": "NOVA",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     },
     "files": [
       "out/**/*",

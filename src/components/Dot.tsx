@@ -9,7 +9,7 @@ import { useVoiceStore } from '../store/useVoiceStore'
 import { useWakeStore } from '../store/useWakeStore'
 import { useConfig } from '../store/useNovaStore'
 import { VoiceIndicator } from './VoiceIndicator'
-import { NovaLogo } from './NovaLogo'
+import { NovaBubble } from './NovaLogo'
 
 const DOT_SIZE = 26
 const DRAG_THRESHOLD = 5
@@ -86,8 +86,8 @@ export function Dot() {
         animate={{
           scale: hovered ? 1.2 : 1,
           filter: hovered
-            ? 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.8))'
-            : 'drop-shadow(0 0 6px rgba(168, 85, 247, 0.5))',
+            ? 'drop-shadow(0 0 10px rgba(185, 45, 50, 0.7))'
+            : 'drop-shadow(0 0 6px rgba(185, 45, 50, 0.45))',
         }}
         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         style={{
@@ -101,7 +101,7 @@ export function Dot() {
         }}
         aria-label="NOVA"
       >
-        <NovaLogo size={DOT_SIZE} variant="gradient" decorative />
+        <NovaBubble size={DOT_SIZE} decorative />
         {wakeArmed ? (
           <span
             className="nova-anim-listen"
@@ -111,7 +111,7 @@ export function Dot() {
               position: 'absolute',
               inset: -3,
               borderRadius: '50%',
-              border: '1.5px solid rgba(192, 132, 252, 0.55)',
+              border: '1.5px solid rgba(185, 45, 50, 0.55)',
             }}
           />
         ) : null}

@@ -330,7 +330,7 @@ export function SettingsPanel() {
         >
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <NovaLogo size={16} variant="gradient" decorative />
-            <span style={{ color: 'var(--nova-royal, #a855f7)', fontWeight: 600, fontSize: 13, letterSpacing: '0.08em' }}>
+            <span style={{ color: 'var(--nova-royal, #C23036)', fontWeight: 600, fontSize: 13, letterSpacing: '0.08em' }}>
               NOVA SETTINGS
             </span>
           </span>
@@ -388,7 +388,7 @@ export function SettingsPanel() {
               </div>
               <button
                 className="quick-action-btn"
-                style={{ minWidth: 0, padding: '8px 14px', borderRadius: 999, color: recording ? '#fbbf24' : '#c4b5fd' }}
+                style={{ minWidth: 0, padding: '8px 14px', borderRadius: 999, color: recording ? '#fbbf24' : '#EDE5D2' }}
                 onClick={() => setRecording((r) => !r)}
               >
                 {recording ? 'Listening…' : 'Change'}
@@ -419,7 +419,7 @@ export function SettingsPanel() {
                 </div>
                 <button
                   className="quick-action-btn"
-                  style={{ minWidth: 0, padding: '8px 14px', borderRadius: 999, color: recordingPtt ? '#fbbf24' : '#c4b5fd' }}
+                  style={{ minWidth: 0, padding: '8px 14px', borderRadius: 999, color: recordingPtt ? '#fbbf24' : '#EDE5D2' }}
                   onClick={() => setRecordingPtt((r) => !r)}
                 >
                   {recordingPtt ? 'Listening…' : 'Change'}
@@ -445,7 +445,7 @@ export function SettingsPanel() {
                       height: 7,
                       borderRadius: '50%',
                       background: wakeStatus.armed
-                        ? '#a78bfa'
+                        ? '#E1D6BE'
                         : wakeStatus.available
                           ? 'rgba(148,163,184,0.5)'
                           : '#f87171',
@@ -600,7 +600,7 @@ export function SettingsPanel() {
                         minWidth: 0,
                         padding: '8px 14px',
                         borderRadius: 999,
-                        color: active ? '#a78bfa' : '#94a3b8',
+                        color: active ? '#E1D6BE' : '#9BA3AC',
                         borderColor: active ? 'rgba(139,92,246,0.5)' : undefined,
                       }}
                       onClick={() => void moveDot(d.id)}

@@ -168,6 +168,16 @@ export function createWindowManager(
     win.on('closed', () => {
       if (overlay === win) overlay = null
     })
+    // A first show happens while this page is still loading, so the immediate
+    // 'nova:overlay-shown' send in showOverlay() is lost (@acceptance: first
+    // voice "show favorites"/"show recents" result never appeared). Re-send it
+    // once the renderer can actually receive it; the renderer replays the
+    // one-shot voice list result on that event.
+    win.webContents.once('did-finish-load', () => {
+      if (!win.isDestroyed()) {
+        win.webContents.send('nova:overlay-shown')
+      }
+    })
     loadView(win, 'overlay')
     return win
   }

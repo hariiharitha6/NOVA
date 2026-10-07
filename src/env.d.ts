@@ -60,6 +60,8 @@ declare global {
       onConfigChanged(cb: (config: NovaConfig) => void): () => void
       onVoiceState(cb: (state: VoiceState) => void): () => void
       onConfirmationState(cb: (request: ConfirmationRequest | null) => void): () => void
+      onCommandResult(cb: (response: CommandResponse) => void): () => void
+      getLastVoiceListResult(): Promise<CommandResponse | null>
       onWakeStatus(cb: (status: WakeStatus) => void): () => void
     }
   }

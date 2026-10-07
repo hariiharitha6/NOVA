@@ -104,7 +104,17 @@ export function createWakeWordController(deps: WakeWordControllerDeps): WakeWord
       broadcast('idle', status)
       return
     }
-    spotter.start()
+    try {
+      spotter.start()
+    } catch (error) {
+      // A spotter that cannot open a stream must not take the voice state
+      // machine down with it: reconcile() runs from the voice emit callback.
+      available = false
+      status = error instanceof Error ? error.message : String(error)
+      armed = false
+      broadcast('idle', status)
+      return
+    }
     armed = true
     broadcast('ready', '')
   }

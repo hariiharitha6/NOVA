@@ -22,7 +22,17 @@ type F32 = Float32Array<ArrayBuffer>
  * error to main, which cancels the session and returns to IDLE.
  */
 export function useVoiceMic(): void {
-  const listening = useVoiceStore((s) => s.state.phase === 'listening')
+  const phase = useVoiceStore((s) => s.state.phase)
+  // Capture during LISTENING (the command itself), during PROCESSING (so the
+  // human-readable gap between "command heard" and "waiting for yes/no" does
+  // not tear the mic down and back up — a getUserMedia round-trip between the
+  // endpoints would swallow the first syllable of "yes"), and during CONFIRMING
+  // so a pending prompt can be answered with a spoken "yes"/"no" without
+  // pressing PTT again (V03-S4 / acceptance Bug 2). Audio sent while
+  // processing is dropped by the controller, which only feeds the recognizer
+  // while listening/confirming.
+  const listening =
+    phase === 'listening' || phase === 'processing' || phase === 'confirming'
 
   const ctxRef = useRef<AudioContext | null>(null)
   const streamRef = useRef<MediaStream | null>(null)

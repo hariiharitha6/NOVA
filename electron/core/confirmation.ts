@@ -28,7 +28,7 @@ export const CONFIRMATION_TIMEOUT_MS = 30_000
 export const HIGH_RISK_PROMPT = 'Allow NOVA to perform this action?'
 
 /** Deterministic, fixed vocabulary. No fuzzy or partial phrase matching. */
-export const CONFIRM_PHRASES: readonly string[] = ['yes', 'confirm', 'do it']
+export const CONFIRM_PHRASES: readonly string[] = ['yes', 'yeah', 'confirm', 'do it']
 export const CANCEL_PHRASES: readonly string[] = ['no', 'cancel', 'stop']
 
 export type ConfirmationPhrase = 'confirm' | 'cancel'

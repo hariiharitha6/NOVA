@@ -11,6 +11,13 @@ import { createWindowsApplicationFocusService } from './windows-app-focus'
 
 const SAFE_URL = /^https?:\/\//i
 const EXECUTABLE = /\.exe$/i
+/**
+ * Windows Settings app URI scheme (acceptance Bug 5). A FIXED constant: it is
+ * never built from user text, and it is handed to Electron's `shell.openExternal`
+ * rather than to a shell or a spawned command line, so no command string of any
+ * kind is constructed here.
+ */
+const SYSTEM_SETTINGS_URI = 'ms-settings:'
 
 function spawnExecutable(exePath: string): Promise<LaunchResult> {
   return new Promise((resolve) => {
@@ -60,6 +67,17 @@ async function openUrl(url: string, label: string): Promise<LaunchResult> {
   }
 }
 
+/** Open the Windows Settings app through its fixed URI scheme (Bug 5). */
+async function openSystemSettings(label: string): Promise<LaunchResult> {
+  try {
+    await shell.openExternal(SYSTEM_SETTINGS_URI)
+    return { ok: true, message: '', label }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, message, label }
+  }
+}
+
 export function createWindowsLauncher(): Launcher {
   // Platform-specific focus backend. Core never sees the Win32 implementation.
   const focusService = createWindowsApplicationFocusService()
@@ -77,6 +95,10 @@ export function createWindowsLauncher(): Launcher {
         case 'SEARCH_YOUTUBE':
         case 'OPEN_WEBSITE':
           return openUrl(action.target, action.label)
+        // The OPERATING SYSTEM's Settings app (ms-settings:). Distinct from
+        // OPEN_SETTINGS, which shows NOVA's own settings window.
+        case 'OPEN_SYSTEM_SETTINGS':
+          return openSystemSettings(action.label)
         // Focus an ALREADY RUNNING window. Never launches a second copy.
         case 'FOCUS_APPLICATION':
           return executeFocusApplication(action, { focusService })
