@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <title>NOVA — speech benchmark recorder</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+        background: #0b0f1a;
+        color: #e6ebf5;
+      }
+      header { padding: 16px 20px 8px; }
+      h1 { margin: 0 0 4px; font-size: 18px; }
+      .sub { color: #8ea0bf; font-size: 12px; }
+      .privacy {
+        margin: 12px 20px;
+        padding: 10px 12px;
+        border: 1px solid #23324d;
+        border-radius: 8px;
+        background: #101a2c;
+        color: #b9c7de;
+        font-size: 12px;
+      }
+      .consent {
+        margin: 12px 20px;
+        padding: 12px;
+        border: 1px solid #2f4467;
+        border-radius: 8px;
+        background: #0f1725;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      .consent input { margin-top: 3px; }
+      .layout { display: flex; gap: 16px; padding: 0 20px 20px; }
+      .panel { flex: 1; min-width: 0; }
+      #list { max-height: 380px; overflow: auto; border: 1px solid #1e2a40; border-radius: 8px; }
+      .item {
+        display: flex; gap: 10px; align-items: center;
+        padding: 8px 10px; border-bottom: 1px solid #1620340; cursor: pointer;
+      }
+      .item:hover { background: #101a2c; }
+      .item.active { background: #16233a; box-shadow: inset 3px 0 0 #4f8cff; }
+      .item .id { font-family: ui-monospace, monospace; color: #8ea0bf; font-size: 12px; min-width: 128px; }
+      .item .ref { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .badge { font-size: 11px; padding: 1px 7px; border-radius: 999px; }
+      .badge.done { background: #143d2a; color: #66d9a0; }
+      .badge.todo { background: #3a2418; color: #e0a066; }
+      .controls { margin-top: 12px; }
+      .current { padding: 12px; border: 1px solid #1e2a40; border-radius: 8px; background: #0f1725; }
+      .current .big { font-size: 16px; margin: 6px 0; }
+      .hint { color: #8ea0bf; font-size: 12px; }
+      button {
+        font: inherit; padding: 8px 16px; border-radius: 8px; border: 1px solid #33456a;
+        background: #16233a; color: #e6ebf5; cursor: pointer;
+      }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      button.primary { background: #2f6bff; border-color: #2f6bff; }
+      button.primary.recording { background: #d23b3b; border-color: #d23b3b; }
+      .meter { height: 8px; background: #16203a; border-radius: 4px; overflow: hidden; margin-top: 10px; }
+      .meter > div { height: 100%; width: 0; background: linear-gradient(90deg, #2f6bff, #66d9a0); transition: width 60ms linear; }
+      .row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+      .status { color: #8ea0bf; font-size: 12px; margin-top: 8px; min-height: 18px; }
+      .warn { color: #e0a066; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>NOVA — speech benchmark recorder</h1>
+      <div class="sub">Records your own voice locally. Nothing is uploaded.</div>
+    </header>
+
+    <div class="privacy">
+      <strong>Privacy.</strong> Audio is written only to
+      <code>benchmark/speech/samples/</code> on this computer, which is excluded from
+      Git. It is never sent to Ollama, any API, or any model provider. Delete
+      everything with <code>npm run speech:corpus:remove</code>.
+    </div>
+
+    <label class="consent">
+      <input id="consent" type="checkbox" />
+      <span>
+        I consent to recording my own voice for local speech-accuracy testing. I
+        understand the recordings stay on this machine and are removed by
+        <code>npm run speech:corpus:remove</code>.
+      </span>
+    </label>
+
+    <div class="layout">
+      <div class="panel">
+        <div style="margin-bottom: 8px; color: #8ea0bf; font-size: 12px;">
+          Samples <span id="progress"></span>
+        </div>
+        <div id="list"></div>
+      </div>
+
+      <div class="panel" id="current-panel">
+        <div class="current">
+          <div class="id" id="cur-id">—</div>
+          <div class="big" id="cur-prompt">Load a corpus to begin.</div>
+          <div class="hint" id="cur-hint"></div>
+          <div class="meter"><div id="meter-fill"></div></div>
+          <div class="row">
+            <button id="record" class="primary" disabled>Record</button>
+            <button id="skip" disabled>Skip</button>
+          </div>
+          <div class="status" id="status"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

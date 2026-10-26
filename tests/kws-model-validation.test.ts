@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { DEFAULT_KWS_MODEL_NAME, KWS_MODEL_FILES } from '../electron/core/speech/constants'
-import { kwsKeywordLineForPhrase, isEnrolledWakePhrase } from '../electron/core/speech/sherpa-kws'
+import {
+  buildKwsConfig,
+  kwsKeywordLineForPhrase,
+  isEnrolledWakePhrase,
+} from '../electron/core/speech/sherpa-kws'
 
 const MODEL_DIR = join(__dirname, '..', 'resources', 'models', DEFAULT_KWS_MODEL_NAME)
 
@@ -44,28 +48,20 @@ describe.skipIf(!existsSync(MODEL_DIR))('KWS model on disk', () => {
     // This exercises the exact integration NOVA's main process uses, proving
     // the ONNX + tokens files are compatible with the installed WASM runtime.
     const sherpa = require('sherpa-onnx')
-    const kws = sherpa.createKws({
-      featConfig: { sampleRate: 16000, featureDim: 80 },
-      modelConfig: {
-        transducer: {
-          encoder: join(MODEL_DIR, KWS_MODEL_FILES[0]),
-          decoder: join(MODEL_DIR, KWS_MODEL_FILES[1]),
-          joiner: join(MODEL_DIR, KWS_MODEL_FILES[2]),
-        },
+    // Build the config through the SAME pure builder production uses, so this
+    // test validates the real code path (including the `samplingRate` key).
+    const kws = sherpa.createKws(
+      buildKwsConfig({
+        sampleRate: 16000,
+        featureDim: 80,
+        encoder: join(MODEL_DIR, KWS_MODEL_FILES[0]),
+        decoder: join(MODEL_DIR, KWS_MODEL_FILES[1]),
+        joiner: join(MODEL_DIR, KWS_MODEL_FILES[2]),
         tokens: join(MODEL_DIR, 'tokens.txt'),
-        numThreads: 1,
-        provider: 'cpu',
-        debug: 0,
-        modelType: '',
-        modelingUnit: 'bpe',
         bpeVocab: join(MODEL_DIR, 'bpe.model'),
-      },
-      maxActivePaths: 4,
-      numTrailingBlanks: 1,
-      keywordsScore: 1.0,
-      keywordsThreshold: 0.25,
-      keywords: kwsKeywordLineForPhrase('Hey NOVA')!,
-    })
+        keywords: kwsKeywordLineForPhrase('Hey NOVA')!,
+      }),
+    )
     expect(kws).toBeTruthy()
 
     // Feed a short silence buffer: the detector must stay quiet and not crash,

@@ -2,9 +2,14 @@
 // Pure functions — no Electron or DOM imports. Unit-testable.
 
 /**
- * High-quality resampling using linear interpolation with anti-aliasing.
- * Converts Float32 PCM from `fromRate` to `toRate`. When rates match, returns
- * the input unchanged. Quality is adequate for speech recognition (16 kHz).
+ * Resample Float32 PCM from `fromRate` to `toRate`. When rates match, returns
+ * the input unchanged.
+ *
+ * Downsampling first applies an anti-aliasing low-pass (a box average over the
+ * input samples that overlap each output interval). Plain decimation without
+ * this step folds energy above the new Nyquist frequency back into the speech
+ * band as noise — worst at 48 kHz → 16 kHz, the common Windows microphone case.
+ * Upsampling uses linear interpolation (no aliasing is introduced by upsampling).
  */
 export function resample(
   samples: Float32Array,
@@ -12,6 +17,47 @@ export function resample(
   toRate: number,
 ): Float32Array {
   if (fromRate === toRate) return samples
+  if (samples.length === 0) return samples
+  if (fromRate > toRate) return downsampleAntiAliased(samples, fromRate, toRate)
+  return upsampleLinear(samples, fromRate, toRate)
+}
+
+/**
+ * Aliasing-resistant decimation: each output sample is the weighted average of
+ * the input samples whose unit intervals overlap `[i*ratio, (i+1)*ratio)`.
+ * For an integer ratio this is an exact box average (e.g. 3:1 averages triples).
+ */
+function downsampleAntiAliased(
+  samples: Float32Array,
+  fromRate: number,
+  toRate: number,
+): Float32Array {
+  const ratio = fromRate / toRate
+  const outLen = Math.round(samples.length / ratio)
+  const out = new Float32Array(outLen)
+  for (let i = 0; i < outLen; i++) {
+    const start = i * ratio
+    const end = Math.min((i + 1) * ratio, samples.length)
+    let sum = 0
+    let weight = 0
+    for (let j = Math.floor(start); j < end; j++) {
+      const overlap = Math.min(end, j + 1) - Math.max(start, j)
+      if (overlap > 0) {
+        sum += (samples[j] ?? 0) * overlap
+        weight += overlap
+      }
+    }
+    out[i] = weight > 0 ? sum / weight : samples[Math.min(samples.length - 1, Math.floor(start))] ?? 0
+  }
+  return out
+}
+
+/** Linear-interpolation upsampling (`fromRate` < `toRate`). */
+function upsampleLinear(
+  samples: Float32Array,
+  fromRate: number,
+  toRate: number,
+): Float32Array {
   const ratio = fromRate / toRate
   const outLen = Math.round(samples.length / ratio)
   const out = new Float32Array(outLen)

@@ -1,6 +1,6 @@
 {
   "name": "nova-desktop",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "NOVA — desktop command launcher",
   "main": "out/main/index.js",
   "homepage": ".",
@@ -12,6 +12,10 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "test": "vitest run",
+    "benchmark:speech": "vitest run tests/speech-benchmark.test.ts",
+    "benchmark:corpus:init": "node scripts/speech-corpus-init.mjs",
+    "benchmark:record": "electron scripts/speech-recorder/main.cjs",
+    "speech:corpus:remove": "node scripts/speech-corpus-remove.mjs",
     "package": "electron-vite build && electron-builder",
     "package:win": "electron-vite build && electron-builder --win"
   },

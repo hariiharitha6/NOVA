@@ -84,6 +84,57 @@ export function isEnrolledWakePhrase(phrase: string): boolean {
   return kwsKeywordLineForPhrase(phrase) !== null
 }
 
+/** Inputs required to build the sherpa-onnx KWS feature-extractor config. */
+export interface KwsFeatureInput {
+  sampleRate: number
+  featureDim: number
+}
+
+/**
+ * Build the KWS `featConfig`. sherpa-onnx reads the `samplingRate` key for the
+ * keyword spotter's feature extractor (node_modules/sherpa-onnx/
+ * sherpa-onnx-kws.js:165), NOT `sampleRate`. Passing `sampleRate` here is
+ * silently ignored and the rate falls back to 16000 — harmless only while the
+ * caller's rate is also 16000, but a real defect if it ever changes.
+ */
+export function buildKwsFeatConfig(input: KwsFeatureInput): Record<string, unknown> {
+  return { samplingRate: input.sampleRate, featureDim: input.featureDim }
+}
+
+export interface KwsConfigInput extends KwsFeatureInput {
+  encoder: string
+  decoder: string
+  joiner: string
+  tokens: string
+  bpeVocab: string
+  keywords: string
+}
+
+/** Build the full sherpa-onnx keyword spotter config. Pure — unit-testable. */
+export function buildKwsConfig(input: KwsConfigInput): Record<string, unknown> {
+  return {
+    featConfig: buildKwsFeatConfig(input),
+    modelConfig: {
+      transducer: { encoder: input.encoder, decoder: input.decoder, joiner: input.joiner },
+      tokens: input.tokens,
+      numThreads: NUM_THREADS,
+      provider: 'cpu',
+      debug: 0,
+      modelType: '',
+      modelingUnit: 'bpe',
+      bpeVocab: input.bpeVocab,
+    },
+    maxActivePaths: KWS_MAX_ACTIVE_PATHS,
+    numTrailingBlanks: KWS_NUM_TRAILING_BLANKS,
+    keywordsScore: KWS_KEYWORDS_SCORE,
+    keywordsThreshold: KWS_KEYWORDS_THRESHOLD,
+    // The `keywords` field is a newline-delimited list of BPE token sequences
+    // for the phrases the model should spot. The entry must be the exact token
+    // sequence (from the model's bpe.model), not the plain text.
+    keywords: input.keywords,
+  }
+}
+
 export class SherpaKeywordSpotter implements KeywordSpotter {
   readonly kind = 'sherpa-onnx-kws'
 
@@ -141,27 +192,16 @@ export class SherpaKeywordSpotter implements KeywordSpotter {
     const tokens = join(this.modelDir, 'tokens.txt')
     const bpeVocab = join(this.modelDir, 'bpe.model')
 
-    const config: Record<string, unknown> = {
-      featConfig: { sampleRate: this.sampleRate, featureDim: KWS_FEATURE_DIM },
-      modelConfig: {
-        transducer: { encoder, decoder, joiner },
-        tokens,
-        numThreads: NUM_THREADS,
-        provider: 'cpu',
-        debug: 0,
-        modelType: '',
-        modelingUnit: 'bpe',
-        bpeVocab,
-      },
-      maxActivePaths: KWS_MAX_ACTIVE_PATHS,
-      numTrailingBlanks: KWS_NUM_TRAILING_BLANKS,
-      keywordsScore: KWS_KEYWORDS_SCORE,
-      keywordsThreshold: KWS_KEYWORDS_THRESHOLD,
-      // The `keywords` field is a newline-delimited list of BPE token
-      // sequences for the phrases the model should spot. The entry must be the
-      // exact token sequence (from the model's bpe.model), not the plain text.
+    const config = buildKwsConfig({
+      sampleRate: this.sampleRate,
+      featureDim: KWS_FEATURE_DIM,
+      encoder,
+      decoder,
+      joiner,
+      tokens,
+      bpeVocab,
       keywords: keywordLine,
-    }
+    })
 
     const kws = sherpa.createKws(config)
     if (!kws) {

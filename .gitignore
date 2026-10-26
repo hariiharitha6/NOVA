@@ -13,3 +13,7 @@ Thumbs.db
 resources/models/*
 !resources/models/sherpa-onnx-kws-hey-nova/
 !resources/models/sherpa-onnx-kws-hey-nova/**
+
+# Local speech benchmark corpus (your own recordings) and measured results.
+# Never committed, never uploaded. Remove with `npm run speech:corpus:remove`.
+benchmark/speech/
